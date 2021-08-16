@@ -1,12 +1,13 @@
 #!/bin/bash
 set -e
 
-
 AICROWD_DATA_ENABLED="YES"
+PYTHON_EXECUTABLE="/Users/Christopher/opt/anaconda3/envs/basalt/bin/python3.7"
+
 if [[ " $@ " =~ " --no-data " ]]; then
    AICROWD_DATA_ENABLED="NO"
 else
-    python3 ./utility/verify_or_download_data.py
+    $PYTHON_EXECUTABLE ./utility/verify_or_download_data.py
 fi
 
 
@@ -25,7 +26,7 @@ trap "kill -11 $! > /dev/null 2>&1;" EXIT
 
 # Run instance manager to generate performance report
 export EVALUATION_STAGE='manager'
-eval "python3 run.py --seeds 1 $EXTRAOUTPUT &"
+eval "$PYTHON_EXECUTABLE run.py --seeds 1 $EXTRAOUTPUT &"
 trap "kill -11 $! > /dev/null 2>&1;" EXIT
 
 # Run the training phase
@@ -37,10 +38,10 @@ export EVALUATION_RUNNING_ON='local'
 export EXITED_SIGNAL_PATH='shared/training_exited'
 rm -f $EXITED_SIGNAL_PATH
 export ENABLE_AICROWD_JSON_OUTPUT='False'
-eval "python3 run.py $EXTRAOUTPUT && touch $EXITED_SIGNAL_PATH || touch $EXITED_SIGNAL_PATH &"
+eval "$PYTHON_EXECUTABLE run.py $EXTRAOUTPUT && touch $EXITED_SIGNAL_PATH || touch $EXITED_SIGNAL_PATH &"
 trap "kill -11 $! > /dev/null 2>&1;" EXIT
 
 # View the evaluation state
 export ENABLE_AICROWD_JSON_OUTPUT='True'
-python3 utility/parser.py || true
+$PYTHON_EXECUTABLE utility/parser.py || true
 kill $(jobs -p)
