@@ -31,7 +31,7 @@ trap "kill -11 $! > /dev/null 2>&1;" EXIT
 
 # Run the evaluation
 sleep 2
-export MINERL_TRACK='CreateVillageAnimalPen'
+export MINERL_TRACK='BuildVillageHouse' # FindCave BuildVillageHouse MakeWaterfall CreateVillageAnimalPen	
 export MINERL_INSTANCE_MANAGER_REMOTE="1"
 export EVALUATION_STAGE='testing'
 export EVALUATION_RUNNING_ON='local'
