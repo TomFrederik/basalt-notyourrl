@@ -2,7 +2,8 @@
 set -e
 
 AICROWD_DATA_ENABLED="YES"
-PYTHON_EXECUTABLE="/Users/Christopher/opt/anaconda3/envs/basalt/bin/python3.7"
+# replace the following with the python executable path in your conda env
+PYTHON_EXECUTABLE="python3"
 
 if [[ " $@ " =~ " --no-data " ]]; then
    AICROWD_DATA_ENABLED="NO"
