@@ -1,7 +1,7 @@
 {
   "challenge_id": "neurips-2021-minerl-basalt-competition",
-  "authors": ["aicrowd-bot"],
+  "authors": ["jun_shern_chan", "chrischongtt", "Alexfrs", "nicholas_kross", "tom4", "alexandra_souly"],
   "description": "Test Model for MineRL BASALT Challenge",
-  "tags": "CreateVillageAnimalPen",
+  "tags": "BuildVillageHouse",
   "gpu": false
 }

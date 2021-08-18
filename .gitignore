@@ -4,6 +4,9 @@ logs/
 .gradle/
 *.pyc
 basalt_utils/src/basalt_utils.egg-info/*
+performance/
+train/trained_policy.pt
+train/events.out.tfevents*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -132,3 +135,6 @@ dmypy.json
 
 # Pycharm
 .idea/
+
+# VSCode
+*.vscode
