@@ -71,12 +71,12 @@ def prev_frame():
 def main(
     env_name,
     log_dir,
-    model_version,
+    version,
     data_dir
     ):
     # compute model path
-    model_path = os.path.join(log_dir, 'PretrainedVQVAE', env_name, 'lightning_logs', 'version_'+int(model_version), 'checkpoints', 'last.ckpt')
-    
+    model_path = os.path.join(log_dir, 'PretrainedVQVAE', env_name, 'lightning_logs', 'version_'+str(version), 'checkpoints', 'last.ckpt')
+
     if 'init' not in st.session_state:
         st.session_state.model, st.session_state.pipeline, st.session_state.traj_names = init(env_name, model_path, data_dir)
         st.session_state.model.eval()
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', default='MineRLNavigate-v0')
     parser.add_argument('--log_dir', type=str, default="./run_logs")
-    parser.add_argument('--model_version', type=int, default=0)
+    parser.add_argument('--version', type=int, default=0, help='Version of the model to load')
     parser.add_argument('--data_dir', type=str, default='./data')
     
     args = parser.parse_args()

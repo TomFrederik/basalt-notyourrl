@@ -3,8 +3,8 @@ NUM_EMBED = 512
 EMBED_DIM = 32
 N_HID = 64
 BATCH_SIZE = 500
-LOG_DIR = "./run_logs"
-DATA_DIR = "./data"
+LOG_DIR = "/home/lieberummaas/datadisk/basalt-notyourrl/run_logs"
+DATA_DIR = "/home/lieberummaas/datadisk/basalt-notyourrl/data"
 ENV_NAME = "MineRLNavigate-v0"
 
 # run training script

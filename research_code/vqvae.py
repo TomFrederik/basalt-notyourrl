@@ -17,6 +17,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from scipy.cluster.vq import kmeans2
 
 import datasets
+import einops
 
 # Credit goes to Andrej Kaparthy, from whose code this is adapted
 # -----------------------------------------------------------------------------
@@ -206,7 +207,7 @@ class VQVAE(pl.LightningModule):
 
     def forward(self, x):
         z = self.encoder(x)
-        z_q, latent_loss, ind = self.quantizer(z)
+        z_q, latent_loss, ind, log_priors = self.quantizer(z)
         x_hat = self.decoder(z_q)
         return x_hat, latent_loss, ind
     
@@ -219,9 +220,14 @@ class VQVAE(pl.LightningModule):
         return z_q, diff, ind, log_priors
     
     def training_step(self, batch, batch_idx):
-        print(f'{batch.shape = }')
-        # center image
-        img = self.recon_loss.inmap(batch)
+        # unpack batch and do some basic transforms on the image
+        obs, *_ = zip(batch)
+        img = obs[0]['pov'][0]
+        img = einops.rearrange(img, 'b h w c -> b c h w') # switch to channel-first
+        img = img.float() / 255 # convert from uint8 to float32
+
+        # center image values
+        img = self.recon_loss.inmap(img)
         
         # forward pass
         img_hat, latent_loss, ind = self.forward(img)
@@ -368,7 +374,12 @@ class GenerateCallback(pl.Callback):
         self.every_n_batches = every_n_batches
         self.save_to_disk = save_to_disk
         self.initial_loading = False
-        self.img_batch = dataset.iter.buffered_batch_iter(batch_size)
+        obs, *_ = next(dataset.iter.buffered_batch_iter(batch_size, num_batches=1))
+        img = torch.from_numpy(obs['pov'])
+        print(img.shape)
+        img = einops.rearrange(img, 'b h w c -> b c h w')
+        img = img.float() / 255
+        self.img_batch = img
 
     def on_batch_end(self, trainer, pl_module):
         """
@@ -420,7 +431,7 @@ def main():
     parser.add_argument("--data_dir", type=str, default='./data')
     parser.add_argument("--env_name", type=str, default='MineRLNavigate-v0')
     parser.add_argument("--batch_size", type=int, default=500)
-    parser.add_argument("--num_workers", type=int, default=6)
+    parser.add_argument("--num_workers", type=int, default=1)
     # model loading args
     parser.add_argument('--load_from_checkpoint', default=False, action='store_true')
     parser.add_argument('--version', default=None, type=int, help='Version of model, if training is resumed from checkpoint')
@@ -429,6 +440,9 @@ def main():
     # done!
     args = parser.parse_args()
     # -------------------------------------------------------------------------
+
+    if args.num_workers > 1:
+        print('\n\nWARNING: num_workers > 1 will likely not work as intended. Proceed with caution!\n\n')
 
     # make sure that relevant dirs exist
     run_name = f'PretrainedVQVAE/{args.env_name}'
@@ -450,7 +464,7 @@ def main():
         model = VQVAE(**vqvae_kwargs)
 
     # load data
-    train_data = datasets.VQVAEDataset(args.env_name, args.data_dir, args.batch_size)
+    train_data = datasets.VQVAEDataset(args.env_name, args.data_dir, args.batch_size, args.epochs)
     train_loader = DataLoader(train_data, num_workers=args.num_workers)
 
     # create callbacks
