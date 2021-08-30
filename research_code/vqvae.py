@@ -179,6 +179,18 @@ class Quantizer(nn.Module):
 class VQVAE(pl.LightningModule):
 
     def __init__(self, n_hid, embedding_dim, num_embeddings, input_channels=3, log_perplexity=False, perplexity_freq=500):
+        '''
+        VQ-VAE adapted from https://github.com/karpathy/deep-vector-quantization
+        
+        Args:
+            n_hid - Parameter which determines the number of channels in the conv nets. See the Encoder/Decoder class for details.
+            embedding_dim - Dimension of the discrete embedding vectors in the latent space.
+            num_embeddings - Size of the codebook, i.e. how many different discrete vectors will be learned
+            input_channels - Number of input channels
+            log_perplexity - Whether to log perplexity (for debugging purposes), will give insights about the learned embedding vectors/their usage
+            perplexity_freq - Log perplexity every N training steps
+        '''
+        
         super().__init__()
         self.save_hyperparameters()
 
@@ -279,9 +291,12 @@ class VQVAE(pl.LightningModule):
 
         return optimizer
 
-    # ---------- inference-only methods -----------
+    # ---------- inference-only methods -> won't track gradients! -----------
     @torch.no_grad()
     def reconstruct_only(self, x):
+        '''
+        Basically performs the complete forward pass without tracking gradients. Will only return reconstructed image, not the latent loss.
+        '''
         z = self.encoder(self.recon_loss.inmap(x))
         z_q, *_ = self.quantizer(z)
         x_hat = self.decoder(z_q)
@@ -290,12 +305,18 @@ class VQVAE(pl.LightningModule):
     
     @torch.no_grad()
     def decode_only(self, z_q):
+        '''
+        Decode a discrete, latent representation
+        '''
         x_hat = self.decoder(z_q)
         x_hat = self.recon_loss.unmap(x_hat)
         return x_hat
 
     @torch.no_grad()
     def encode_only(self, x):
+        '''
+        Encodes an image into the discrete latent representation
+        '''
         z = self.encoder(self.recon_loss.inmap(x))
         z_q, _, ind, log_priors = self.quantizer(z)
         return z_q, ind, log_priors
@@ -387,6 +408,7 @@ def main():
     # training related
     parser.add_argument('--log_freq', type=int, default=10, help='How often to save values to the logger')
     parser.add_argument('--save_freq', type=int, default=500, help='Save the model every N training steps')
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--progbar_rate', type=int, default=1, help='How often to update the progress bar in the command line interface')
     parser.add_argument('--callback_batch_size', type=int, default=6, help='How many images to reconstruct for callback (shown in tensorboard/images)')
     parser.add_argument('--callback_freq', type=int, default=100, help='How often to reconstruct for callback (shown in tensorboard/images)')
@@ -455,7 +477,7 @@ def main():
         callbacks=callbacks, 
         default_root_dir=log_dir, 
         gpus=torch.cuda.device_count(),
-        max_epocs=args.epochs,
+        max_epochs=args.epochs,
         accelerator='dp',
         log_every_n_steps=args.log_freq,
         progress_bar_refresh_rate=args.progbar_rate
