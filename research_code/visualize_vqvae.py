@@ -57,7 +57,6 @@ def select_traj(traj_name=None):
     st.session_state.pov = (einops.rearrange(pov.cpu().numpy(), 'b c h w -> b h w c') * 255).astype(np.uint8)
     st.session_state.rec_pov = (einops.rearrange(rec_pov.cpu().numpy(), 'b c h w -> b h w c') * 255).astype(np.uint8)
 
-
 def update_frame():
     st.session_state.frame = st.session_state.slider_frame
 
