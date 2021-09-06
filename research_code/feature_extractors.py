@@ -6,11 +6,12 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import einops
 
 class VQVAEFeatureExtractor(BaseFeaturesExtractor):
-    def __init__(self, vqvae_path, observation_space=gym.spaces.Box(0, 1, shape=(3,64,64)), features_dim=128):
+    def __init__(self, observation_space, vqvae_path, features_dim=128):
         super().__init__(observation_space, features_dim)
         
         # load vqvae
         self.vqvae = VQVAE.load_from_checkpoint(vqvae_path)
+        self.vqvae.eval()
         
         # conv net that operates on the vqvae latent image and distills it down to a single vector
         # TODO make conv net customizable via kwargs
@@ -32,7 +33,7 @@ class VQVAEFeatureExtractor(BaseFeaturesExtractor):
         )
         
     def forward(self, observations):
-        out = self.vqvae.encode_with_grad(observations)
+        out = self.vqvae.encode_only(observations)[0]
         out = self.conv_net(out)
         out = self.linear(einops.rearrange(out, 'b c h w -> b (c h w)')) # flatten image from (C 1 1) -> C
         return out

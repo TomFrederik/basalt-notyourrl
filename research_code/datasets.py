@@ -38,16 +38,19 @@ class AIRLDataset(IterableDataset):
         
         # create iterator from pipeline
         self.iter = minerl.data.BufferedBatchIter(self.data)       
-         
+        
+        
     def __iter__(self):
         '''
         Returns next tuple in the iterator.
         '''
-        obs, act, rew, next_obs, done = self.iter.buffered_batch_iter(self.batch_size, self.num_epochs)
+        obs, act, rew, next_obs, done = next(self.iter.buffered_batch_iter(self.batch_size, self.num_epochs))
         out = {
-            'obs':obs,
+            'obs':obs['pov'],
             'acts':act,
             'next_obs':next_obs,
             'dones':done
         }
+        print(out['obs'].shape)
+        print(len(out['obs']))
         yield out

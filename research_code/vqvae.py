@@ -18,6 +18,7 @@ from scipy.cluster.vq import kmeans2
 
 import datasets
 import einops
+import minerl
 
 # Credit goes to Andrej Kaparthy, from whose code this is adapted
 # -----------------------------------------------------------------------------
@@ -221,8 +222,8 @@ class VQVAE(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         # unpack batch and do some basic transforms on the image
-        obs, *_ = zip(batch)
-        img = obs[0]['pov'][0]
+        obs, *_ = batch
+        img = obs['pov'][0]
         img = einops.rearrange(img, 'b h w c -> b c h w') # switch to channel-first
         img = img.float() / 255 # convert from uint8 to float32
 
@@ -376,7 +377,7 @@ class GenerateCallback(pl.Callback):
         self.initial_loading = False
         obs, *_ = next(dataset.iter.buffered_batch_iter(batch_size, num_batches=1))
         img = torch.from_numpy(obs['pov'])
-        print(img.shape)
+        
         img = einops.rearrange(img, 'b h w c -> b c h w')
         img = img.float() / 255
         self.img_batch = img
@@ -430,7 +431,7 @@ def main():
     # dataloader related
     parser.add_argument("--data_dir", type=str, default='./data')
     parser.add_argument("--env_name", type=str, default='MineRLNavigate-v0')
-    parser.add_argument("--batch_size", type=int, default=500)
+    parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--num_workers", type=int, default=1)
     # model loading args
     parser.add_argument('--load_from_checkpoint', default=False, action='store_true')
@@ -464,6 +465,8 @@ def main():
         model = VQVAE(**vqvae_kwargs)
 
     # load data
+    if not os.path.exists(os.path.join(args.data_dir, args.env_name)):
+        minerl.data.download(args.data_dir, environment=args.env_name)
     train_data = datasets.VQVAEDataset(args.env_name, args.data_dir, args.batch_size, args.epochs)
     train_loader = DataLoader(train_data, num_workers=args.num_workers)
 
