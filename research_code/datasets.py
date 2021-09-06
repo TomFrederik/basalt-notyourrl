@@ -26,6 +26,7 @@ class VQVAEDataset(IterableDataset):
 class AIRLDataset(IterableDataset):
     '''
     For docs on BufferedBatchIter, see https://github.com/minerllabs/minerl/blob/dev/minerl/data/buffered_batch_iter.py
+    This Dataset matches the expectations of AdversarialTrainer
     '''
     def __init__(self, env_name, data_dir, batch_size, num_epochs):
         # save params
