@@ -18,7 +18,7 @@ def initialize(cfg_file):
             cfg[key] = str(output_dir / cfg[key])
     print(f"Initializing run (save this ID for subsequent runs): {cfg['run_id']}")
     
-    out_cfg_file = Path(cfg["out_cfg_file"])
+    out_cfg_file = output_dir / "run.yaml"
     out_cfg_file.parent.mkdir(parents=True, exist_ok=True)
     with open(out_cfg_file, "w") as f:
         yaml.dump(cfg, f)
