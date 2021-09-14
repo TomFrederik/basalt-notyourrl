@@ -1,0 +1,14 @@
+# This is a central config file to store all configuration parameters for RLHPD.
+env_task: MineRLBasaltFindCave-v0
+demos_path: ./data
+outputs_base: ./output
+run_id: null # Autopopulate with timestamp if null; feel free to create your own ID
+# All paths with `out_` prefix will be relative to $outputs_base/$run_id
+out_log_dir: log
+out_models_dir: models
+out_annotation_db: annotation.db
+out_replay_buf_file: replay_buf.pkl
+clip_sampler:
+  # TODO: Pick params intelligently
+  num_clips: 50
+  clip_length: 50 # Number of frames
