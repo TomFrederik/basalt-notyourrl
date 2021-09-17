@@ -4,7 +4,7 @@ import einops
 import numpy as np
 from torch.utils.data import Dataset
 import minerl
-
+import torch
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
@@ -132,6 +132,8 @@ class MemoryDataset(Dataset):
     def __getitem__(self, idx):
         state, action, next_state, reward, n_step_state, n_step_reward, td_error = self.combined_memory[idx]
         
+        action = self._preprocess_action(action)
+        
         pov = einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
         next_pov = einops.rearrange(next_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
         n_step_pov = einops.rearrange(n_step_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
@@ -146,6 +148,14 @@ class MemoryDataset(Dataset):
         weight = self.weights[idx]
 
         return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), action, reward, n_step_reward, idx, weight
+
+    def preprocess_action(self, action):
+        #TODO
+        # this probably should depend on the specific environment
+        # it should involve pretty heavy action shaping probably
+        action = None
+        raise NotImplementedError
+        return action
     
     def _preprocess_other_obs(self, state):
         '''
@@ -220,8 +230,5 @@ def loss_function(
     return loss
 
 
-def preprocess_actions(actions):
-    #TODO
-    raise NotImplementedError
 
 

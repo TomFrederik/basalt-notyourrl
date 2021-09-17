@@ -17,10 +17,13 @@ from DQfD_models import QNetwork
 
 def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
     
+    # init tensorboard writer
     writer = SummaryWriter(log_dir)
     
+    # init optimizer
     optimizer = torch.optim.AdamW(q_net.parameters(), lr=lr, weight_decay=weight_decay)
     
+    # init target q_net
     target_q_net = deepcopy(q_net).eval()
     
     steps = 0
@@ -79,18 +82,6 @@ def main(env_name, pretrain_steps, save_freq,
     
     # set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-    # init q net
-    q_net_kwargs = {
-        'num_actions':0,#TODO
-        'inv_dim':0,#TODO
-        'n_hid':n_hid,
-        'pov_feature_dim':pov_feature_dim,
-        'inv_feature_dim':inv_feature_dim,
-        'inv_network_dim':inv_network_dim,
-        'q_net_dim':q_net_dim
-    }
-    q_net = QNetwork(**q_net_kwargs) #TODO
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -105,6 +96,20 @@ def main(env_name, pretrain_steps, save_freq,
         data_dir,
         num_expert_episodes
     )
+
+    # init q net
+    inv_dim = dataset[0][0][0].shape[0]
+    print(f'{inv_dim = }')
+    q_net_kwargs = {
+        'num_actions':0,#TODO
+        'inv_dim':inv_dim,
+        'n_hid':n_hid,
+        'pov_feature_dim':pov_feature_dim,
+        'inv_feature_dim':inv_feature_dim,
+        'inv_network_dim':inv_network_dim,
+        'q_net_dim':q_net_dim
+    }
+    q_net = QNetwork(**q_net_kwargs) #TODO
     
     # launch pretraining
     q_net = pretrain(
