@@ -136,18 +136,26 @@ class MemoryDataset(Dataset):
         next_pov = einops.rearrange(next_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
         n_step_pov = einops.rearrange(n_step_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
 
-        # TODO: change this to capture inventory or such
-        vec = state['vector'].astype(np.float32)
-        next_vec = next_state['vector'].astype(np.float32)
-        n_step_vec = n_step_state['vector'].astype(np.float32)
+        inv = self._preprocess_other_obs(state)
+        next_inv = self._preprocess_other_obs(next_state)
+        n_step_inv = self._preprocess_other_obs(n_step_state)
 
         reward = reward.astype(np.float32)
         n_step_reward = n_step_reward.astype(np.float32)
         
         weight = self.weights[idx]
 
-        return (pov, vec), (next_pov, next_vec), (n_step_pov, n_step_vec), action, reward, n_step_reward, idx, weight
+        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), action, reward, n_step_reward, idx, weight
     
+    def _preprocess_other_obs(self, state):
+        '''
+        Takes a state dict and stacks all observations that do not belong to 'pov' into a single vector and returns this vector
+        #TODO: Figure out how to treat the multivalued parts of the vector (e.g. one-hot encoding and then appending the one-hot vectors)
+        '''
+        inv_obs = None # TODO
+        raise NotImplementedError
+        return inv_obs
+        
     def add_episode(self, obs, actions, rewards, td_errors, memory_id):
         self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id)
     

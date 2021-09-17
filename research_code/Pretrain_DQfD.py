@@ -2,25 +2,26 @@ import argparse
 import os
 import random
 from time import time
-
 import einops
 import numpy as np
+from tqdm import tqdm
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
-from tqdm import tqdm
-
 from torch.utils.data import Dataset
-
 from torch.utils.tensorboard import SummaryWriter
 
 from DQfD_utils import MemoryDataset
 from DQfD_models import QNetwork
 
-def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay):
+def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
     
     writer = SummaryWriter(log_dir)
     
     optimizer = torch.optim.AdamW(q_net.parameters(), lr=lr, weight_decay=weight_decay)
+    
+    target_q_net = deepcopy(q_net).eval()
     
     steps = 0
     while steps < pretrain_steps:
@@ -28,12 +29,12 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
-        (pov, vec), (next_pov, next_vec), _, cur_expert_action, _, _, idcs, weight = zip([dataset[idx] for idx in batch_idcs])
+        (pov, inv), (next_pov, next_inv), _, cur_expert_action, _, _, idcs, weight = zip([dataset[idx] for idx in batch_idcs])
 
         # forward pass
-        cur_q_values = q_net.forward(...)
+        cur_q_values = q_net.forward(dict(pov=pov, inv=inv))
         with torch.no_grad():
-            next_q_values = q_net.forward(...)
+            next_q_values = target_q_net.forward(dict(pov=next_pov, inv=next_inv))
         
         # zero gradients
         optimizer.zero_grad(set_to_none=True)
@@ -59,13 +60,17 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         if steps % save_freq == 0:
             print('Saving model...')
             torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
-
+        
+        if steps % update_freq == 0:
+            print('Updating target model...')
+            target_q_net = deepcopy(q_net)
+            
     return q_net
 
 def main(env_name, pretrain_steps, save_freq,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
-         pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim):
+         pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
     
     # set save dir
     # TODO: save config in file path?
@@ -112,7 +117,8 @@ def main(env_name, pretrain_steps, save_freq,
         batch_size,
         supervised_loss_margin,
         lr,
-        weight_decay
+        weight_decay,
+        update_freq
     )
     
     print('Training finished! Saving model...')
@@ -144,6 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--inv_network_dim', type=int, default=128)
     parser.add_argument('--pov_feature_dim', type=int, default=128)
     parser.add_argument('--q_net_dim', type=int, default=128)
+    parser.add_argument('--update_freq', type=int, default=100)
     
     args = parser.parse_args()
     
