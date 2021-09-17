@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from DQfD_utils import MemoryDataset
+from DQfD_models import QNetwork
 
 def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay):
     
@@ -63,7 +64,8 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
 
 def main(env_name, pretrain_steps, save_freq,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
-         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin):
+         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
+         pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim):
     
     # set save dir
     # TODO: save config in file path?
@@ -74,7 +76,16 @@ def main(env_name, pretrain_steps, save_freq,
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # init q net
-    q_net = None #TODO
+    q_net_kwargs = {
+        'num_actions':0,#TODO
+        'inv_dim':0,#TODO
+        'n_hid':n_hid,
+        'pov_feature_dim':pov_feature_dim,
+        'inv_feature_dim':inv_feature_dim,
+        'inv_network_dim':inv_network_dim,
+        'q_net_dim':q_net_dim
+    }
+    q_net = QNetwork(**q_net_kwargs) #TODO
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -128,6 +139,11 @@ if __name__ == '__main__':
     parser.add_argument('--discount_factor', type=float, default=0.99)
     parser.add_argument('--agent_memory_capacity', type=int, default=20000)
     parser.add_argument('--pretrain_steps', type=int, default=10000)
+    parser.add_argument('--n_hid', type=int, default=64)
+    parser.add_argument('--inv_feature_dim', type=int, default=128)
+    parser.add_argument('--inv_network_dim', type=int, default=128)
+    parser.add_argument('--pov_feature_dim', type=int, default=128)
+    parser.add_argument('--q_net_dim', type=int, default=128)
     
     args = parser.parse_args()
     
