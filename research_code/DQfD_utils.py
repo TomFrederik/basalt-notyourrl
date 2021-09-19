@@ -118,14 +118,15 @@ class MemoryDataset(Dataset):
         IS_exponent,
         env_name,
         data_dir,
-        num_expert_episodes
+        num_expert_episodes,
     ):
         '''
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
         self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
-    
+        self.env_name = env_name
+        
     def __len__(self):
         return len(self.combined_memory)
     
@@ -149,13 +150,17 @@ class MemoryDataset(Dataset):
 
         return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), action, reward, n_step_reward, idx, weight
 
-    def preprocess_action(self, action):
-        #TODO
-        # this probably should depend on the specific environment
-        # it should involve pretty heavy action shaping probably
-        action = None
-        raise NotImplementedError
-        return action
+    def _preprocess_action(self, action):
+        '''
+        Returns the shaped action, depending on the environment
+        '''
+        return {
+            'MineRLBasaltFindCave-v0':find_cave_action,
+            'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
+            'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
+            'MineRLBasaltBuildVillageHouse-v0':build_house_action
+        }[self.env_name](action)
+        
     
     def _preprocess_other_obs(self, state):
         '''
@@ -198,7 +203,7 @@ class MemoryDataset(Dataset):
 
             td_errors = np.ones_like(rewards)
             
-            actions = preprocess_actions(act)
+            actions = self._preprocess_action(act)
 
             # add episode to memory
             self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id='expert')
@@ -231,4 +236,22 @@ def loss_function(
 
 
 
+'''
+Define the action shaping functions, which take the original action
+and map it to the shaped action
+'''
+def find_cave_action(action):
+    #TODO
+    raise NotImplementedError
 
+def make_waterfall_action(action):
+    #TODO
+    raise NotImplementedError
+
+def build_house_action(action):
+    #TODO
+    raise NotImplementedError
+
+def create_pen_action(action):
+    #TODO
+    raise NotImplementedError
