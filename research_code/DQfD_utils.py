@@ -9,7 +9,9 @@ import torch
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
 
-
+# angles of rotation above which we consider camera actions (TODO: arbitrary values, probably need tweaking)
+PITCH_MARGIN=5
+YAW_MARGIN=5
 
 class ReplayBuffer(object):
 
@@ -240,9 +242,55 @@ def loss_function(
 Define the action shaping functions, which take the original action
 and map it to the shaped action
 '''
+def get_cam_actions_shaped(delta_pitch, delta_yaw, pitch_margin, yaw_margin):
+    '''
+    Transform a single item camera action --> 'camera': [float, float] into a 4-item dict of
+    camera actions -->  {'camera_down': bool, 'camera_left': bool, 'camera_right': bool, 'camera_up': bool}
+    '''
+    cam_actions_shaped = {'camera_down':False , 'camera_left':False, 'camera_right':False, 'camera_up':False}
+    if delta_pitch < -pitch_margin: # camera down
+        cam_actions_shaped['camera_down'] = True
+    elif delta_pitch > pitch_margin: # camera up
+        cam_actions_shaped['camera_up'] = True
+    if delta_yaw < -yaw_margin:  # camera left
+        cam_actions_shaped['camera_left'] = True
+    elif delta_yaw > yaw_margin: # camera right
+        cam_actions_shaped['camera_right'] = True
+    return cam_actions_shaped
+
+def remove_actions(actions, actions_to_remove):
+    '''
+    Remove dict items by a given list of keys
+    '''
+    for act in actions_to_remove:
+        del actions[act]
+    return actions
+
+def insert_actions(actions, key_ref, actions_to_insert):
+    '''
+    Insert OrderedDict items into another OrderedDict after a specified position given by a reference key
+    '''
+    new_actions = actions.__class__()
+    for key, value in actions.items():
+        new_actions[key] = value
+        if key == key_ref:
+            for k,v in actions_to_insert.items():
+                new_actions[k] = v
+    actions.clear()
+    actions.update(new_actions)
+    return actions
+
 def find_cave_action(action):
-    #TODO
-    raise NotImplementedError
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'], PITCH_MARGIN, YAW_MARGIN)
+    # insert shaped camera actions
+    action_withcam = insert_actions(action, 'back', cam_actions_shaped)
+    # remove actions that are not needed
+    action_withcam_lean = remove_actions(action_withcam, ['sprint', 'sneak', 'camera', 'equip'])  # TODO: figure out 'equip'
+    # convert to one-hot so actions can be fed to a neural network
+    action_one_hot = np.array([int(a) for a in action_withcam_lean.values()]).astype(np.float32)
+
+    return action_one_hot
 
 def make_waterfall_action(action):
     #TODO
