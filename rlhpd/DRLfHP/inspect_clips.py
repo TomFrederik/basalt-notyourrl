@@ -51,7 +51,8 @@ class App:
                 rewards.append(reward)
             ImageSequenceClip(list(imgs), fps=20).write_gif('/tmp/left.gif', fps=20)
             st.image('/tmp/left.gif')
-            st.metric("Total reward", np.sum(rewards))
+            reward_1 = np.sum(rewards)
+            st.metric("Total reward", reward_1)
 
         with col2:
             # option = st.selectbox(
@@ -71,7 +72,17 @@ class App:
                 rewards.append(reward)
             ImageSequenceClip(list(imgs), fps=20).write_gif('/tmp/right.gif', fps=20)
             st.image('/tmp/right.gif')
-            st.metric("Total reward", np.sum(rewards))
+            reward_2 = np.sum(rewards)
+            st.metric("Total reward", np.sum(reward_2))
+        
+        if np.abs(reward_1 - reward_2) < 0.2*np.abs(reward_1 + reward_2):
+            st.info("It's a tie!")
+        elif reward_1 > reward_2:
+            with col1:
+                st.success("Winner!")
+        else: # reward_1 < reward_2:
+            with col2:
+                st.success("Winner!")
 
 
 if __name__ == '__main__':

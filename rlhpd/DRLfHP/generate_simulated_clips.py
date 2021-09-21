@@ -11,6 +11,7 @@ output: A folder of clips (.pkl containing list of (S,A,R,S,D) tuples)
 """
 
 import gym
+import numpy as np
 import pickle
 import uuid
 from pathlib import Path
@@ -20,10 +21,11 @@ TOTAL_TRAIN_STEPS = 10000
 TRAIN_STAGES = 10
 CLIPS_PER_STAGE = 10
 EVAL_EPISODE_STEPS = 100
-CLIP_LENGTH = 10 # Num frames (=steps)
+CLIP_LENGTH = 30 # Num frames (=steps)
 OUT_DIR = Path("./output")
+GYM_ENV = 'CartPole-v1'
 
-env = gym.make('CartPole-v1')
+env = gym.make(GYM_ENV)
 model = A2C('MlpPolicy', env, verbose=1)
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -38,11 +40,24 @@ for k in range(TRAIN_STAGES):
     while saved_clips < CLIPS_PER_STAGE:
         action, _state = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
+        if GYM_ENV == 'CartPole-v1':
+            # Override reward in CartPole which does not give instantaneous feedback
+            # Source: https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py
+            # Observation:
+            # Type: Box(4)
+            # Num     Observation               Min                     Max
+            # 0       Cart Position             -4.8                    4.8
+            # 1       Cart Velocity             -Inf                    Inf
+            # 2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
+            # 3       Pole Angular Velocity     -Inf                    Inf
+            pos, vel, angle, angular_vel = obs
+            # reward = np.cos(angle * np.deg2rad(90) / np.deg2rad(24)) - vel
+            reward = - (np.abs(vel) + np.abs(angular_vel)) # Minimize any motion
         img = env.render(mode="rgb_array")
 
         current_clip.append((img, action, reward))
         if len(current_clip) == CLIP_LENGTH:
-            # TODO pickle
+            # Save pickle
             unique_filename = str(uuid.uuid4())
             outfile = (OUT_DIR / unique_filename).with_suffix('.pickle')
             with open(outfile, 'wb') as f:
