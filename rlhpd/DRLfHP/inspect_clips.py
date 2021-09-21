@@ -11,6 +11,7 @@ import cv2
 import minerl
 from moviepy.editor import ImageSequenceClip
 
+import utils
 
 class App:
     def __init__(self):
@@ -34,55 +35,38 @@ class App:
 
         col1, col2 = st.columns([1,1])
         with col1:
-            # option = st.selectbox(
-            #     'Select a trajectory:',
-            #     traj_paths)
-            # chosen_path = option
             chosen_path = random.choice(traj_paths)
             st.write(chosen_path)
             with open(chosen_path, 'rb') as f:
-                clip = pickle.load(f)
+                clip_1 = pickle.load(f)
 
-            imgs = []
-            rewards = []
-            for frame in clip:
-                img, action, reward = frame
-                imgs.append(img)
-                rewards.append(reward)
-            ImageSequenceClip(list(imgs), fps=20).write_gif('/tmp/left.gif', fps=20)
+            imgs = [img for img, action, reward in clip_1]
+            reward_1 = np.sum([reward for img, action, reward in clip_1])
+            ImageSequenceClip(imgs, fps=20).write_gif('/tmp/left.gif', fps=20)
             st.image('/tmp/left.gif')
-            reward_1 = np.sum(rewards)
             st.metric("Total reward", reward_1)
 
         with col2:
-            # option = st.selectbox(
-            #     'Select a trajectory:',
-            #     traj_paths)
-            # chosen_path = option
             chosen_path = random.choice(traj_paths)
             st.write(chosen_path)
             with open(chosen_path, 'rb') as f:
-                clip = pickle.load(f)
+                clip_2 = pickle.load(f)
 
-            imgs = []
-            rewards = []
-            for frame in clip:
-                img, action, reward = frame
-                imgs.append(img)
-                rewards.append(reward)
+            imgs = [img for img, action, reward in clip_2]
+            reward_2 = np.sum([reward for img, action, reward in clip_2])
             ImageSequenceClip(list(imgs), fps=20).write_gif('/tmp/right.gif', fps=20)
             st.image('/tmp/right.gif')
-            reward_2 = np.sum(rewards)
-            st.metric("Total reward", np.sum(reward_2))
+            st.metric("Total reward", reward_2)
         
-        if np.abs(reward_1 - reward_2) < 0.2*np.abs(reward_1 + reward_2):
-            st.info("It's a tie!")
-        elif reward_1 > reward_2:
+        judgement = utils.simulate_judgement(clip_1, clip_2)
+        if judgement == (0.5, 0.5):
+            st.info(f"It's a tie! {judgement}")
+        elif judgement == (1, 0):
             with col1:
-                st.success("Winner!")
-        else: # reward_1 < reward_2:
+                st.success(f"Winner! {judgement}")
+        else: # judgement == (0, 1)
             with col2:
-                st.success("Winner!")
+                st.success(f"Winner! {judgement}")
 
 
 if __name__ == '__main__':
