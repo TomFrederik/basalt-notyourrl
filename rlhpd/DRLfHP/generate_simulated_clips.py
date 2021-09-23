@@ -10,6 +10,7 @@ output: A folder of clips (.pkl containing list of (S,A,R,S,D) tuples)
 
 """
 
+import cv2
 import gym
 import numpy as np
 import pickle
@@ -54,6 +55,7 @@ for k in range(TRAIN_STAGES):
             # reward = np.cos(angle * np.deg2rad(90) / np.deg2rad(24)) - vel
             reward = - (np.abs(vel) + np.abs(angular_vel)) # Minimize any motion
         img = env.render(mode="rgb_array")
+        img = cv2.resize(img, dsize=(64, 64)) # Resize to the dimensions we expect later
 
         current_clip.append((img, action, reward))
         if len(current_clip) == CLIP_LENGTH:

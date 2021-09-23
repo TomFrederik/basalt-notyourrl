@@ -1,14 +1,14 @@
 # import numpy as np
 
-def simulate_judgement(clip_1, clip_2, diff_tol = 0.2):
-    reward_1 = sum([reward for (img, action, reward) in clip_1])
-    reward_2 = sum([reward for (img, action, reward) in clip_2])
+def simulate_judgement(clip_a, clip_b, diff_tol = 0.2):
+    reward_a = sum([reward for (img, action, reward) in clip_a])
+    reward_b = sum([reward for (img, action, reward) in clip_b])
 
-    if abs(reward_1 - reward_2) < diff_tol * max(abs(reward_1), abs(reward_2)):
+    if abs(reward_a - reward_b) < diff_tol * max(abs(reward_a), abs(reward_b)):
         # Tie if the difference is less than tol% of the larger reward
         judgement = (0.5, 0.5)
-    elif reward_1 > reward_2:
+    elif reward_a > reward_b:
         judgement = (1, 0)
-    else: # reward_1 < reward_2:
+    else: # reward_a < reward_b:
         judgement = (0, 1)
     return judgement
