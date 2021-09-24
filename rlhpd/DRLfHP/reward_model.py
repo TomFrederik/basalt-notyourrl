@@ -22,10 +22,13 @@ def get_pred_accuracy(prefer_probs, true_judgements):
     acc = eq.sum() / len(eq)
     return acc
 
-def evaluate_model_accuracy(reward_model, dataloader):
+def evaluate_model_accuracy(reward_model, dataloader, max_batches=None):
     total_answers = 0
     correct_answers = 0
-    for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+    tqdm_total = len(dataloader) if max_batches is None else max_batches
+    for batch_idx, batch in tqdm(enumerate(dataloader), total=tqdm_total):
+        if max_batches is not None and batch_idx >= max_batches:
+            break
         frames_a, frames_b, true_judgements = \
             batch['frames_a'], batch['frames_b'], batch['judgement']
         # Use model to predict probabilities of each judgement
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     cfg.max_num_pairs = None
     cfg.rand_seed = 0
     cfg.val_split = 0.1
-    cfg.log_every = 50
+    cfg.val_every = 50
     cfg.save_every = 100
 
     set_seeds(cfg.rand_seed)
@@ -119,17 +122,14 @@ if __name__ == '__main__':
         optimizer.step()
 
         # Evaluation & logging
-        if batch_idx % cfg.log_every == 0:
+        with torch.no_grad():
             reward_model.eval()
-            with torch.no_grad():
-                # Train accuracy
-                train_acc = get_pred_accuracy(prefer_probs, judgements)
-                # train_acc = evaluate_model_accuracy(reward_model, train_dataloader)
+            wandb.log({"loss": loss.item()})
+            train_acc = get_pred_accuracy(prefer_probs, judgements)
+            wandb.log({"train_acc": train_acc})
+            if batch_idx % cfg.val_every == 0:
                 # Validation accuracy
                 val_acc = evaluate_model_accuracy(reward_model, val_dataloader)
-                # Log metrics
-                wandb.log({"loss": loss.item()})
-                wandb.log({"train_acc": train_acc})
                 wandb.log({"val_acc": val_acc})
             reward_model.train()
         
