@@ -1,100 +1,19 @@
-from os import access
-import re
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import wandb
-
-class RewardModel(nn.Module):
-    """
-    For the reward model, we use the same configuration as the Atari experiments in Christiano et al. (2017): 
-    84x84x4 stacked frames (same as the inputs to the policy) as inputs to 4 convolutional layers of 
-    size 7x7, 5x5, 3x3, and 3x3 with strides 3, 2, 1, 1, each having 16 filters, with leaky ReLU 
-    nonlinearities (α = 0.01). This is followed by a fully connected layer of size 64 and then a 
-    scalar output. The agent action at is not used as input as this did not improve performance. 
-
-    - Convolutional layers use batch normalization (Ioffe and Szegedy, 2015) 
-    - TODO: with decay rate 0.99
-    - Conv layers have per-channel dropout (Srivastava et al., 2014) with α = 0.8.
-    """
-
-    def __init__(self):
-        super().__init__()
-        # pov feature extractor
-        # 64x64
-        channel = 16
-        relu_negative_slope = 0.01
-        dropout_rate = 0.2
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, channel, 7, stride=3),
-            nn.BatchNorm2d(channel),
-            nn.Dropout(dropout_rate),
-            nn.LeakyReLU(negative_slope=relu_negative_slope, inplace=True),
-
-            nn.Conv2d(channel, channel, 5, stride=2),
-            nn.BatchNorm2d(channel),
-            nn.Dropout(dropout_rate),
-            nn.LeakyReLU(negative_slope=relu_negative_slope, inplace=True),
-            
-            nn.Conv2d(channel, channel, 3, stride=1),
-            nn.BatchNorm2d(channel),
-            nn.Dropout(dropout_rate),
-            nn.LeakyReLU(negative_slope=relu_negative_slope, inplace=True),
-            
-            nn.Conv2d(channel, channel, 3, stride=1),
-            nn.BatchNorm2d(channel),
-            nn.Dropout(dropout_rate),
-            nn.LeakyReLU(negative_slope=relu_negative_slope, inplace=True),
-            
-            nn.Flatten(),
-            nn.Linear(256, 64),
-            nn.Linear(64, 1),
-        )
-
-    def forward(self, obs):
-        out = self.conv(obs)
-        return out
-
-
 import argparse
-import numpy as np
 import pickle
 import random
 from pathlib import Path
 
 import einops
+import numpy as np
 import torch
+import wandb
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-import utils
 import dataset
-
-def pred_pref_probs(reward_model, frames_a, frames_b, judgements):
-    batch_imgs = torch.stack([frames_a, frames_b], axis=1)
-    current_batch_size = len(batch_imgs) # == cfg.batch_size except at the end of the dataset
-    assert batch_imgs.shape == (current_batch_size, 2, cfg.clip_length, 3, 64, 64)
-    assert judgements.shape == (current_batch_size, 2)
-    
-    # Flatten the (batch, Trajectory, time) dimensions to feed B,C,W,H into CNN
-    batch_imgs = einops.rearrange(batch_imgs, 'b T t c w h -> (b T t) c w h')
-    assert batch_imgs.shape == (current_batch_size * 2 * cfg.clip_length, 3, 64, 64)
-
-    # Predict reward of every frame in our batch
-    r_preds = reward_model(torch.as_tensor(batch_imgs, dtype=torch.float32)).squeeze()
-    assert r_preds.shape == (len(batch_imgs),)
-
-    # Reshape and sum up rewards along each
-    all_rewards = r_preds.view(current_batch_size, 2, cfg.clip_length)
-    assert all_rewards.shape == (current_batch_size, 2, cfg.clip_length)
-    reward_sums = torch.sum(all_rewards, dim=2)
-    assert reward_sums.shape == (current_batch_size, 2)
-
-    # Convert pairs of rewards into preference probabilities
-    prefer_probs = torch.softmax(reward_sums, dim=1)
-    assert prefer_probs.shape == (current_batch_size, 2)
-    return prefer_probs
+import model
+import utils
 
 def get_pred_accuracy(prefer_probs, true_judgements):
     pred_judgements = utils.probs_to_judgements(prefer_probs.detach().numpy())
@@ -102,6 +21,24 @@ def get_pred_accuracy(prefer_probs, true_judgements):
     eq = np.all(true_judgements.numpy() == pred_judgements, axis=1)
     acc = eq.sum() / len(eq)
     return acc
+
+def evaluate_model_accuracy(reward_model, dataloader):
+    total_answers = 0
+    correct_answers = 0
+    for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+        frames_a, frames_b, true_judgements = \
+            batch['frames_a'], batch['frames_b'], batch['judgement']
+        # Use model to predict probabilities of each judgement
+        probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
+        # Round probabilities to the closest judgement
+        pred_judgements = utils.probs_to_judgements(probs.detach().numpy())
+        assert pred_judgements.shape == true_judgements.shape
+        # Compare prediction to true judgements
+        eq = np.all(true_judgements.numpy() == pred_judgements, axis=1)
+        correct_answers += eq.sum()
+        total_answers += len(eq)
+    mean_acc = correct_answers / total_answers
+    return mean_acc
 
 def set_seeds(num):
     torch.manual_seed(num)
@@ -113,10 +50,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train reward model')
     parser.add_argument("-c", "--clips-dir", default="./output",
                         help="Clips directory. Default: %(default)s")
+    parser.add_argument("-s", "--save-root-dir", default="./models",
+                        help="Root directory to save models. Default: %(default)s")
     options = parser.parse_args()
 
     wandb.init(project='DRLfHP-cartpole', entity='junshern')
     # wandb.init(project='DRLfHP-cartpole', entity='junshern', mode="disabled")
+
+    save_dir = Path(options.save_root_dir) / wandb.run.name
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # The model is trained on batches of 16 segment pairs (see below), 
     # optimized with Adam (Kingma and Ba, 2014) 
@@ -130,10 +72,11 @@ if __name__ == '__main__':
     cfg.rand_seed = 0
     cfg.val_split = 0.1
     cfg.log_every = 50
+    cfg.save_every = 100
 
     set_seeds(cfg.rand_seed)
 
-    reward_model = RewardModel()
+    reward_model = model.RewardModel()
     wandb.watch(reward_model)
     optimizer = torch.optim.Adam(
         reward_model.parameters(),
@@ -162,7 +105,7 @@ if __name__ == '__main__':
             data_batch['frames_a'], data_batch['frames_b'], data_batch['judgement']
 
         # Run prediction pipeline
-        prefer_probs = pred_pref_probs(reward_model, frames_a, frames_b, judgements)
+        prefer_probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
 
         # Calculate loss:
         # This is ALMOST CrossEntropy but slightly different because we want to support
@@ -177,20 +120,24 @@ if __name__ == '__main__':
 
         # Evaluation & logging
         if batch_idx % cfg.log_every == 0:
+            reward_model.eval()
             with torch.no_grad():
                 # Train accuracy
                 train_acc = get_pred_accuracy(prefer_probs, judgements)
+                # train_acc = evaluate_model_accuracy(reward_model, train_dataloader)
                 # Validation accuracy
-                for val_batch_idx, val_batch in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
-                    val_frames_a, val_frames_b, val_judgements = \
-                        val_batch['frames_a'], val_batch['frames_b'], val_batch['judgement']
-                    val_probs = pred_pref_probs(
-                        reward_model, val_frames_a, val_frames_b, val_judgements)
-                    val_acc = get_pred_accuracy(val_probs, val_judgements)
+                val_acc = evaluate_model_accuracy(reward_model, val_dataloader)
                 # Log metrics
                 wandb.log({"loss": loss.item()})
                 wandb.log({"train_acc": train_acc})
                 wandb.log({"val_acc": val_acc})
+            reward_model.train()
+        
+        # Save model
+        if batch_idx % cfg.save_every == 0:
+            save_path = save_dir / f"{batch_idx:05d}.pt"
+            torch.save(reward_model.state_dict(), save_path)
+            print("Saved model to", save_path)
 
         # TODO: A fraction of 1/e of the data is held out to be used as a validation set. 
         # We use L2- regularization of network weights with the adaptive scheme described in 
@@ -215,9 +162,7 @@ if __name__ == '__main__':
         # JS: This is only when passing as output to the RL algorithm?
         # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
 
-        # print("Running behavioral cloning pretraining!")
-        # model_path = Path(cfg["out_models_dir"]) / "Q_0.pth"
-        # model_path.parent.mkdir(parents=True, exist_ok=True)
-        # print("Saving model to", model_path)
-        # with open(model_path, "w") as f:
-        #     f.write("DUMMY MODEL")
+    # Save final model
+    save_path = save_dir / f"{batch_idx:05d}.pt"
+    torch.save(reward_model.state_dict(), save_path)
+    print("Saved model to", save_path)
