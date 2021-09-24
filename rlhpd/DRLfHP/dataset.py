@@ -84,7 +84,7 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
-    for i_batch, sample_batched in tqdm(enumerate(train_dataloader), total=len(train_dataloader):
+    for i_batch, sample_batched in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
         frames_a = sample_batched['frames_a']
         frames_b = sample_batched['frames_b']
         judgements = sample_batched['judgement']

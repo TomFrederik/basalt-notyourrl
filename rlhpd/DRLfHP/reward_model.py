@@ -118,11 +118,13 @@ if __name__ == '__main__':
     wandb.init(project='DRLfHP-cartpole', entity='junshern')
     # wandb.init(project='DRLfHP-cartpole', entity='junshern', mode="disabled")
 
-    # TODO: The model is trained on batches of 16 segment pairs (see below), 
+    # The model is trained on batches of 16 segment pairs (see below), 
     # optimized with Adam (Kingma and Ba, 2014) 
-    # with learning rate 0.0003, β1 = 0.9, β2 = 0.999, and  = 10−8 .
+    # with learning rate 0.0003, β1 = 0.9, β2 = 0.999, and eps = 10^−8 .
     cfg = wandb.config
-    cfg.learning_rate = 1e-4
+    cfg.adam_lr = 0.0003
+    cfg.adam_betas = (0.9, 0.999)
+    cfg.adam_eps = 1e-8
     cfg.batch_size = 16
     cfg.max_num_pairs = None
     cfg.rand_seed = 0
@@ -133,7 +135,11 @@ if __name__ == '__main__':
 
     reward_model = RewardModel()
     wandb.watch(reward_model)
-    optimizer = torch.optim.SGD(reward_model.parameters(), lr=cfg.learning_rate)
+    optimizer = torch.optim.Adam(
+        reward_model.parameters(),
+        lr=cfg.adam_lr,
+        betas=cfg.adam_betas,
+        eps=cfg.adam_eps)
 
     traj_paths = sorted([x for x in Path(options.clips_dir).glob("*.pickle")])
 
@@ -186,32 +192,32 @@ if __name__ == '__main__':
                 wandb.log({"train_acc": train_acc})
                 wandb.log({"val_acc": val_acc})
 
-    #     # TODO: A fraction of 1/e of the data is held out to be used as a validation set. 
-    #     # We use L2- regularization of network weights with the adaptive scheme described in 
-    #     # Christiano et al. (2017): the L2-regularization weight increases if the average 
-    #     # validation loss is more than 50% higher than the average training loss, and decreases 
-    #     # if it is less than 10% higher (initial weight 0.0001, multiplicative rate of change 
-    #     # 0.001 per learning step).
+        # TODO: A fraction of 1/e of the data is held out to be used as a validation set. 
+        # We use L2- regularization of network weights with the adaptive scheme described in 
+        # Christiano et al. (2017): the L2-regularization weight increases if the average 
+        # validation loss is more than 50% higher than the average training loss, and decreases 
+        # if it is less than 10% higher (initial weight 0.0001, multiplicative rate of change 
+        # 0.001 per learning step).
 
-    #     # TODO: An extra loss proportional to the square of the predicted rewards is added 
-    #     # to impose a zero-mean Gaussian prior on the reward distribution.
+        # TODO: An extra loss proportional to the square of the predicted rewards is added 
+        # to impose a zero-mean Gaussian prior on the reward distribution.
 
-    #     # TODO: Gaussian noise of amplitude 0.1 (the grayscale range is 0 to 1) is added to the inputs.
-    #     # TODO: Grayscale images?
+        # TODO: Gaussian noise of amplitude 0.1 (the grayscale range is 0 to 1) is added to the inputs.
+        # TODO: Grayscale images?
 
-    #     # TODO: We assume there is a 10% chance that the annotator responds uniformly at random, 
-    #     # so that the model will not overfit to possibly erroneous preferences. We account for 
-    #     # this error rate by using Pˆ e = 0.9Pˆ + 0.05 instead of Pˆ for the cross-entropy computation.
+        # TODO: We assume there is a 10% chance that the annotator responds uniformly at random, 
+        # so that the model will not overfit to possibly erroneous preferences. We account for 
+        # this error rate by using Pˆ e = 0.9Pˆ + 0.05 instead of Pˆ for the cross-entropy computation.
 
-    #     # TODO: since the reward model is trained merely on comparisons, its absolute scale is arbitrary. 
-    #     # Therefore we normalize its output so that it has 0 mean and standard deviation 0.05 
-    #     # across the annotation buffer
-    #     # JS: This is only when passing as output to the RL algorithm?
-    #     # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
+        # TODO: since the reward model is trained merely on comparisons, its absolute scale is arbitrary. 
+        # Therefore we normalize its output so that it has 0 mean and standard deviation 0.05 
+        # across the annotation buffer
+        # JS: This is only when passing as output to the RL algorithm?
+        # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
 
-    #         # print("Running behavioral cloning pretraining!")
-    #         # model_path = Path(cfg["out_models_dir"]) / "Q_0.pth"
-    #         # model_path.parent.mkdir(parents=True, exist_ok=True)
-    #         # print("Saving model to", model_path)
-    #         # with open(model_path, "w") as f:
-    #         #     f.write("DUMMY MODEL")
+        # print("Running behavioral cloning pretraining!")
+        # model_path = Path(cfg["out_models_dir"]) / "Q_0.pth"
+        # model_path.parent.mkdir(parents=True, exist_ok=True)
+        # print("Saving model to", model_path)
+        # with open(model_path, "w") as f:
+        #     f.write("DUMMY MODEL")
