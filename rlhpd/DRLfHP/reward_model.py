@@ -74,8 +74,9 @@ if __name__ == '__main__':
     cfg.max_num_pairs = None
     cfg.rand_seed = 0
     cfg.val_split = 0.1
-    cfg.val_every = 50
-    cfg.save_every = 100
+    cfg.val_every_n_batch = 100
+    cfg.save_every_n_epoch = 1
+    cfg.num_epochs = 5
 
     set_seeds(cfg.rand_seed)
 
@@ -103,39 +104,44 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
 
-    for batch_idx, data_batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
-        frames_a, frames_b, judgements = \
-            data_batch['frames_a'], data_batch['frames_b'], data_batch['judgement']
+    samples_count = 0
+    for epoch in range(cfg.num_epochs):
+        print("Epoch", epoch)
+        for batch_idx, data_batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
+            frames_a, frames_b, judgements = \
+                data_batch['frames_a'], data_batch['frames_b'], data_batch['judgement']
 
-        # Run prediction pipeline
-        prefer_probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
+            # Run prediction pipeline
+            prefer_probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
 
-        # Calculate loss:
-        # This is ALMOST CrossEntropy but slightly different because we want to support
-        # tie condition (0.5, 0.5) in judgement which is not possible in default XEnt
-        # loss = - (judgement[0] * torch.log(prefer_1) + judgement[1] * torch.log(prefer_2))
-        assert judgements.shape == prefer_probs.shape
-        loss = - torch.sum(judgements * torch.log(prefer_probs))
+            # Calculate loss:
+            # This is ALMOST CrossEntropy but slightly different because we want to support
+            # tie condition (0.5, 0.5) in judgement which is not possible in default XEnt
+            # loss = - (judgement[0] * torch.log(prefer_1) + judgement[1] * torch.log(prefer_2))
+            assert judgements.shape == prefer_probs.shape
+            loss = - torch.sum(judgements * torch.log(prefer_probs))
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        # Evaluation & logging
-        with torch.no_grad():
-            reward_model.eval()
-            wandb.log({"loss": loss.item()})
-            train_acc = get_pred_accuracy(prefer_probs, judgements)
-            wandb.log({"train_acc": train_acc})
-            if batch_idx % cfg.val_every == 0:
-                # Validation accuracy
-                val_acc = evaluate_model_accuracy(reward_model, val_dataloader)
-                wandb.log({"val_acc": val_acc})
-            reward_model.train()
-        
+            # Evaluation & logging
+            with torch.no_grad():
+                reward_model.eval()
+                wandb.log({"loss": loss.item()})
+                train_acc = get_pred_accuracy(prefer_probs, judgements)
+                wandb.log({"train_acc": train_acc})
+                if batch_idx % cfg.val_every_n_batch == 0:
+                    # Validation accuracy
+                    val_acc = evaluate_model_accuracy(reward_model, val_dataloader)
+                    wandb.log({"val_acc": val_acc})
+                reward_model.train()
+            
+            samples_count += len(frames_a)
+
         # Save model
-        if batch_idx % cfg.save_every == 0:
-            save_path = save_dir / f"{batch_idx:05d}.pt"
+        if epoch % cfg.save_every_n_epoch == 0:
+            save_path = save_dir / f"{samples_count:06d}.pt"
             torch.save(reward_model.state_dict(), save_path)
             print("Saved model to", save_path)
 
@@ -163,6 +169,6 @@ if __name__ == '__main__':
         # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
 
     # Save final model
-    save_path = save_dir / f"{batch_idx:05d}.pt"
+    save_path = save_dir / f"{samples_count:06d}.pt"
     torch.save(reward_model.state_dict(), save_path)
     print("Saved model to", save_path)
