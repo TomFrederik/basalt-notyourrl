@@ -13,7 +13,7 @@ import minerl
 import torch
 from moviepy.editor import ImageSequenceClip
 
-import model
+from reward_model import RewardModel
 import utils
 
 class App:
@@ -29,7 +29,7 @@ class App:
 
     # @st.cache(suppress_st_warning=True, allow_output_mutation=True, max_entries=1)
     def load_model(self, model_path):
-        self.model = model.RewardModel()
+        self.model = RewardModel()
         self.model.load_state_dict(torch.load(model_path))
         self.model.eval()
 

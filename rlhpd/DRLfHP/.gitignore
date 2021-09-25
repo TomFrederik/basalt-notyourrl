@@ -1,2 +1,5 @@
 output/
 models/
+policy_models/
+trained_output_trajectories/
+wandb/
