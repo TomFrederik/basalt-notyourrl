@@ -351,12 +351,15 @@ def prioritize_actions(actions, act_prior):
 
     return actions
 
-def index_actions(actions):
+def index_actions(actions, default):
     '''
-    Return the index of the single active action that can be given in the
-    OrderedDict of shaped actions corresponding to a specific task
+    Return an integer given an OrderedDict that can only contain a single active action
+    If no active actions, it defaults to a selected commonly useful action
     '''
-    return np.argmax([v for k, v in actions.items()])
+    if not any([v for k, v in actions.items()]):
+        actions[list(actions.keys())[default]] = 1
+        return actions, default
+    return actions, np.argmax([v for k, v in actions.items()])
 
 def find_cave_action(action):
     # combine attack, forward and jump into a single action
@@ -385,8 +388,10 @@ def find_cave_action(action):
     # prioritize actions
     action_final_prioritized = prioritize_actions(
         action_final, act_prior=ACTION_PRIORITIES['MineRLBasaltFindCave-v0'])
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(action_final_prioritized, 4)
 
-    return action_final_prioritized, index_actions(action_final_prioritized)
+    return action_final_prioritized_indexed, index
 
 def make_waterfall_action(action):
     #TODO
