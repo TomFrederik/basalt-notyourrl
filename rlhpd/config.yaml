@@ -8,7 +8,12 @@ out_log_dir: log
 out_models_dir: models
 out_annotation_db: annotation.db
 out_replay_buf_file: replay_buf.pkl
-clip_sampler:
-  # TODO: Pick params intelligently
-  num_clips: 50
-  clip_length: 50 # Number of frames
+# clip_sampler:
+# TODO: Pick params intelligently
+num_clips: 5
+clip_length: 5 # Number of frames
+max_traj_length: 10
+num_of_traj: 5
+num_of_samples: 5
+sample_length: 5
+pair_per_sample: 2
