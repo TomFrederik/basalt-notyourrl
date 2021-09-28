@@ -24,7 +24,7 @@ def probs_to_judgements(probs_array):
     judgements[0.66 < probs_array] = 1
     return judgements
 
-def predict_pref_probs(reward_model, frames_a, frames_b):
+def predict_pref_probs(reward_model, frames_a, frames_b, ret_rewards=False):
     clip_length = frames_a.shape[1] # shape is (b, t, c, w, h)
     current_batch_size = len(frames_a) # == cfg.batch_size except at the end of the dataset
 
@@ -48,4 +48,7 @@ def predict_pref_probs(reward_model, frames_a, frames_b):
     # Convert pairs of rewards into preference probabilities
     prefer_probs = torch.softmax(reward_sums, dim=1)
     assert prefer_probs.shape == (current_batch_size, 2)
+    if ret_rewards:
+        # Rewards vector is useful during training for regularization loss
+        return prefer_probs, r_preds
     return prefer_probs

@@ -22,9 +22,10 @@ def get_pred_accuracy(prefer_probs, true_judgements):
     acc = eq.sum() / len(eq)
     return acc
 
-def evaluate_model_accuracy(reward_model, dataloader, max_batches=None):
+def evaluate_model_accuracy(reward_model, dataloader, max_batches=None, ret_rewards=False):
     total_answers = 0
     correct_answers = 0
+    all_pred_rewards = [] # Save pred rewards for analysis
     tqdm_total = len(dataloader) if max_batches is None else max_batches
     for batch_idx, batch in tqdm(enumerate(dataloader), total=tqdm_total):
         if max_batches is not None and batch_idx >= max_batches:
@@ -32,7 +33,8 @@ def evaluate_model_accuracy(reward_model, dataloader, max_batches=None):
         frames_a, frames_b, true_judgements = \
             batch['frames_a'], batch['frames_b'], batch['judgement']
         # Use model to predict probabilities of each judgement
-        probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
+        probs, pred_rewards = utils.predict_pref_probs(reward_model, frames_a, frames_b, ret_rewards=True)
+        all_pred_rewards.append(pred_rewards)
         # Round probabilities to the closest judgement
         pred_judgements = utils.probs_to_judgements(probs.detach().numpy())
         assert pred_judgements.shape == true_judgements.shape
@@ -41,6 +43,9 @@ def evaluate_model_accuracy(reward_model, dataloader, max_batches=None):
         correct_answers += eq.sum()
         total_answers += len(eq)
     mean_acc = correct_answers / total_answers
+    if ret_rewards:
+        all_pred_rewards = torch.cat(all_pred_rewards).flatten()
+        return mean_acc, all_pred_rewards
     return mean_acc
 
 def set_seeds(num):
@@ -77,6 +82,7 @@ if __name__ == '__main__':
     cfg.val_every_n_batch = 100
     cfg.save_every_n_epoch = 1
     cfg.num_epochs = 5
+    cfg.gaussian_prior_weight = 0.1
 
     set_seeds(cfg.rand_seed)
 
@@ -112,14 +118,20 @@ if __name__ == '__main__':
                 data_batch['frames_a'], data_batch['frames_b'], data_batch['judgement']
 
             # Run prediction pipeline
-            prefer_probs = utils.predict_pref_probs(reward_model, frames_a, frames_b)
+            prefer_probs, pred_rewards = utils.predict_pref_probs(
+                reward_model, frames_a, frames_b, ret_rewards=True)
+            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.clip_length,),\
+                (pred_rewards.shape, (len(frames_a) * 2 * cfg.clip_length,))
 
             # Calculate loss:
-            # This is ALMOST CrossEntropy but slightly different because we want to support
+            # This is almost CrossEntropy but slightly different because we want to support
             # tie condition (0.5, 0.5) in judgement which is not possible in default XEnt
             # loss = - (judgement[0] * torch.log(prefer_1) + judgement[1] * torch.log(prefer_2))
             assert judgements.shape == prefer_probs.shape
             loss = - torch.sum(judgements * torch.log(prefer_probs))
+            # An extra loss proportional to the square of the predicted rewards is added 
+            # to impose a zero-mean Gaussian prior on the reward distribution.
+            loss += cfg.gaussian_prior_weight * torch.sum(pred_rewards.square())
 
             optimizer.zero_grad()
             loss.backward()
@@ -133,7 +145,9 @@ if __name__ == '__main__':
                 wandb.log({"train_acc": train_acc})
                 if batch_idx % cfg.val_every_n_batch == 0:
                     # Validation accuracy
-                    val_acc = evaluate_model_accuracy(reward_model, val_dataloader)
+                    val_acc, val_rewards = evaluate_model_accuracy(
+                        reward_model, val_dataloader, ret_rewards=True)
+                    wandb.log({"val_rewards": wandb.Histogram(val_rewards)}) # For debugging
                     wandb.log({"val_acc": val_acc})
                 reward_model.train()
             
@@ -151,9 +165,6 @@ if __name__ == '__main__':
         # validation loss is more than 50% higher than the average training loss, and decreases 
         # if it is less than 10% higher (initial weight 0.0001, multiplicative rate of change 
         # 0.001 per learning step).
-
-        # TODO: An extra loss proportional to the square of the predicted rewards is added 
-        # to impose a zero-mean Gaussian prior on the reward distribution.
 
         # TODO: Gaussian noise of amplitude 0.1 (the grayscale range is 0 to 1) is added to the inputs.
         # TODO: Grayscale images?
