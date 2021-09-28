@@ -135,6 +135,7 @@ def find_cave_action(action):
                                       keys_to_avoid=['camera', 'equip', 'left', 'right', 'use'])
     
     # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    print(action)
     cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
                                                 PITCH_MARGIN, YAW_MARGIN,
                                                 action['left'], action['right'])

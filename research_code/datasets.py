@@ -1,5 +1,8 @@
 from torch.utils.data import Dataset, IterableDataset
 import minerl
+import itertools
+import einops
+import numpy as np
 
 class VQVAEDataset(IterableDataset):
     '''
@@ -38,19 +41,21 @@ class AIRLDataset(IterableDataset):
         
         # create iterator from pipeline
         self.iter = minerl.data.BufferedBatchIter(self.data)       
+        self.iter = self.iter.buffered_batch_iter(self.batch_size, self.num_epochs)
         
-        
-    def __iter__(self):
+    def get_generator(self, obs, act, rew, next_obs, done):
         '''
         Returns next tuple in the iterator.
         '''
-        obs, act, rew, next_obs, done = next(self.iter.buffered_batch_iter(self.batch_size, self.num_epochs))
+        obs = einops.rearrange(obs['pov'].astype(np.float32) / 255, 'b h w c -> b c h w')
+        next_obs = einops.rearrange(next_obs['pov'].astype(np.float32) / 255, 'b h w c -> b c h w')
         out = {
-            'obs':obs['pov'],
-            'acts':act,
+            'obs':obs,
+            'acts':act['vector'],
             'next_obs':next_obs,
             'dones':done
         }
-        print(out['obs'].shape)
-        print(len(out['obs']))
-        yield out
+        return out
+    
+    def __iter__(self):
+        return itertools.starmap(self.get_generator, self.iter)

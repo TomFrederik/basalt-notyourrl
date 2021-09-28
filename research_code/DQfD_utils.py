@@ -78,7 +78,7 @@ class CombinedMemory(object):
     
         # recompute weights
         self._update_weights()
-   
+
     def _update_weights(self):
         weights = np.array([(sars.td_error + self.memory_dict[key].p_offset) ** self.PER_exponent for key in ['expert', 'agent'] for sars in self.memory_dict[key].memory])
         #print(weights.shape)
@@ -87,7 +87,10 @@ class CombinedMemory(object):
         self.weights = weights / np.max(weights)
         
     def __getitem__(self, idx):
-        return np.concatenate([self.memory_dict['expert'].memory, self.memory_dict['agent'].memory])[idx]
+        if idx < len(self.memory_dict['expert'].memory):
+            return self.memory_dict['expert'].memory[idx]
+        else:
+            return self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)]
 
     def sample(self, batch_size):
         idcs = np.random.choice(np.arange(len(self)), size=batch_size, replace=False, p=self.weights)
@@ -123,9 +126,9 @@ class MemoryDataset(Dataset):
         '''
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
+        self.env_name = env_name
         self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
-        self.env_name = env_name
         
     def __len__(self):
         return len(self.combined_memory)
@@ -161,7 +164,7 @@ class MemoryDataset(Dataset):
             'MineRLBasaltBuildVillageHouse-v0':build_house_action
         }[self.env_name](action)
         
-        one_hot = np.array([map(lambda x: x[1], action_dict)]).astype(np.float32)
+        one_hot = np.array([*map(lambda x: x, action_dict.values())]).astype(np.float32)
         
         return one_hot
         
@@ -199,12 +202,9 @@ class MemoryDataset(Dataset):
 
             # load trajectory
             print(f'Loading {i+1}th episode...')
-
-            obs, act, rewards, _ = zip(*data.load_data(trajectory_name))
+            obs, actions, rewards, *_ = zip(*data.load_data(trajectory_name))
 
             td_errors = np.ones_like(rewards)
-            
-            actions = np.array([map(self._preprocess_action, act)])
 
             # add episode to memory
             self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id='expert')

@@ -78,7 +78,7 @@ def main(
     
     # set up data loading
     data = AIRLDataset(env_name, data_dir, expert_batch_size, num_epochs=1)
-    dataloader = torch.utils.data.DataLoader(data)
+    dataloader = torch.utils.data.DataLoader(data, batch_size=None)
     #print(next(iter(data))['acts']['vector'].shape) # (10, 64)
     
     # set up post wrappers
@@ -91,7 +91,7 @@ def main(
     venv: VecEnv = util.make_vec_env(env_name, n_envs=n_envs, post_wrappers=post_wrappers)
     
     # set up logger
-    airl_logger = logger.configure(os.path.join(log_dir, 'AIRL/'))
+    airl_logger = logger.configure(os.path.join(log_dir, 'AIRL/'), format_strs=["tensorboard"])
     
     # define reward kwargs
     reward_net_kwargs = {
@@ -125,10 +125,10 @@ if __name__ == '__main__':
     parser.add_argument('--env_name', type=str, default='MineRLTreechopVectorObf-v0')
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--log_dir', type=str, default='./run_logs')
-    parser.add_argument('--expert_batch_size', type=int, default=10)
+    parser.add_argument('--expert_batch_size', type=int, default=100)
     parser.add_argument('--n_envs', type=int, default=1)
-    parser.add_argument('--total_timesteps', type=int, default=200)
-    parser.add_argument('--gen_algo_steps', type=int, default=10)
+    parser.add_argument('--total_timesteps', type=int, default=200000)
+    parser.add_argument('--gen_algo_steps', type=int, default=1000)
     parser.add_argument('--discount_factor', type=float, default=0.99)
     parser.add_argument('--visual_model_path', type=str, default=None)
     parser.add_argument('--disable_verbose', action='store_false')

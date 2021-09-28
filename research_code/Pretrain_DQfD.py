@@ -139,14 +139,13 @@ def main(env_name, pretrain_steps, save_freq,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env_name', default='MineRLTreechop-v0')
-    parser.add_argument('--log_dir', default='/home/lieberummaas/datadisk/minerl/run_logs')
+    parser.add_argument('--env_name', default='MineRLBasaltFindCave-v0')
+    parser.add_argument('--log_dir', default='/home/lieberummaas/datadisk/basalt-notyourrl/run_logs')
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--num_expert_episodes', type=int, default=10)
     parser.add_argument('--n_step', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--save_freq', type=int, default=100)
-    parser.add_argument('--action_repeat', type=int, default=5)
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--epsilon', type=float, default=0.01)
     parser.add_argument('--PER_exponent', type=float, default=0.4, help='PER exponent')
