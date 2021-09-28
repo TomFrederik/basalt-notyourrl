@@ -20,8 +20,8 @@ class QNetwork(nn.Module):
             nn.ReLU(inplace=True),
             ResBlock(2*n_hid, 2*n_hid//4),
             ResBlock(2*n_hid, 2*n_hid//4),
-            Rearrange('b c h w -> (b h w) c'),
-            nn.Linear(2*n_hid, pov_feature_dim)
+            Rearrange('b c h w -> b (h w c)'),
+            nn.Linear(2*n_hid*16*16, pov_feature_dim)
         )
         
         # feature extractor for other observations
