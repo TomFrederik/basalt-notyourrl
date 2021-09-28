@@ -3,6 +3,8 @@ import os
 import random
 from time import time
 import einops
+import gym
+from random import random, randint
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
@@ -12,10 +14,13 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
-from DQfD_utils import MemoryDataset
+from DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs
 from DQfD_models import QNetwork
 
-def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
+# epsilon for epsilon-greedy policy
+EPSILON = 0.05 # TODO: put this in argparse
+
+def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
     
     # init tensorboard writer
     writer = SummaryWriter(log_dir)
@@ -26,27 +31,58 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
     # init target q_net
     target_q_net = deepcopy(q_net).eval()
     
+    # init env
+    env = gym.make(env_name)
+    obs = env.reset()
+    done = False
+    
     steps = 0
-    while steps < pretrain_steps:
+    while steps < train_steps:
         steps += 1
+        
+        while not done:
+            # sample action from epsilon-greedy behavior policy
+            if random() < EPSILON:
+                # choose a random action
+                action = randint(0, q_net.num_actions)
+            else:
+                # choose action with highest Q value
+                with torch.no_grad():
+                    q_values = q_net.forward(dict(pov=obs['pov'], inv=preprocess_non_pov_obs(obs)))
+                    # TODO
+                    raise NotImplementedError
         
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
-        (pov, inv), (next_pov, next_inv), _, cur_expert_action, _, _, idcs, weight = zip([dataset[idx] for idx in batch_idcs])
+        (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), cur_expert_action, reward, n_step_reward, idcs, weight = zip([dataset[idx] for idx in batch_idcs])
 
         # forward pass
         cur_q_values = q_net.forward(dict(pov=pov, inv=inv))
         with torch.no_grad():
             next_q_values = target_q_net.forward(dict(pov=next_pov, inv=next_inv))
+            n_step_q_values = target_q_net.forward(dict(pov=n_step_pov, inv=n_step_inv))
+            best_one_step_target_value = torch.max(next_q_values, dim=1)
+            best_n_step_target_value = torch.max(n_step_q_values, dim=1)
+        
+        # sample 
         
         # zero gradients
         optimizer.zero_grad(set_to_none=True)
 
         # compute loss
-        pre_max_q = cur_q_values + supervised_loss_margin
-        pre_max_q[np.arange(len(cur_expert_action)), cur_expert_action] -= supervised_loss_margin
-        J_E = torch.max(pre_max_q, dim=1)[0] - cur_q_values[np.arange(len(cur_expert_action)), cur_expert_action]
-        J_E = weight * J_E
+        loss_function(
+            reward, 
+            action, 
+            cur_expert_action, 
+            discount_factor, 
+            best_one_step_target_value, 
+            cur_q_values, 
+            supervised_loss_margin, 
+            n_step_reward, 
+            best_n_step_target_value, 
+            n_step
+        )
+        
         
         # backward and step
         J_E.backward()
@@ -70,7 +106,7 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
             
     return q_net
 
-def main(env_name, pretrain_steps, save_freq,
+def main(env_name, train_steps, save_freq,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
          pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
@@ -112,16 +148,17 @@ def main(env_name, pretrain_steps, save_freq,
         'inv_network_dim':inv_network_dim,
         'q_net_dim':q_net_dim
     }
-    q_net = QNetwork(**q_net_kwargs)
+    q_net = QNetwork(**q_net_kwargs).load_state_dict(torch.load(q_net_path))
     
-    # launch pretraining
-    q_net = pretrain(
+    # launch training
+    q_net = train(
         log_dir,
+        env_name,
         save_freq,
         dataset,
         discount_factor, 
         q_net,
-        pretrain_steps,
+        train_steps,
         batch_size,
         supervised_loss_margin,
         lr,
@@ -152,7 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--supervised_loss_margin', type=float, default=0.8)
     parser.add_argument('--discount_factor', type=float, default=0.99)
     parser.add_argument('--agent_memory_capacity', type=int, default=20000)
-    parser.add_argument('--pretrain_steps', type=int, default=10000)
+    parser.add_argument('--train_steps', type=int, default=100)
     parser.add_argument('--n_hid', type=int, default=64)
     parser.add_argument('--inv_feature_dim', type=int, default=128)
     parser.add_argument('--inv_network_dim', type=int, default=128)

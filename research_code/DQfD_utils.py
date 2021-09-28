@@ -165,11 +165,8 @@ class MemoryDataset(Dataset):
     def _preprocess_other_obs(self, state):
         '''
         Takes a state dict and stacks all observations that do not belong to 'pov' into a single vector and returns this vector
-        #TODO: Figure out how to treat the multivalued parts of the vector (e.g. one-hot encoding and then appending the one-hot vectors)
         '''
-        inv_obs = None # TODO
-        raise NotImplementedError
-        return inv_obs
+        return preprocess_non_pov_obs(state)
         
     def add_episode(self, obs, actions, rewards, td_errors, memory_id):
         self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id)
@@ -209,7 +206,27 @@ class MemoryDataset(Dataset):
             self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id='expert')
 
         print('\nLoaded ',len(self.combined_memory.memory_dict['expert']),' expert samples!')
-        
+
+
+def preprocess_non_pov_obs(state):
+    # add damage vector to inv_obs
+    inv_obs = [state['equipped_items']['mainhand']['damage'], state['equipped_items']['mainhand']['maxDamage']]
+    
+    # get number of inventory items to one-hot encoded 'equip' type
+    inv = list(state['inventory'].values())
+    num_inv_items = len(inv) + 3 # in addition to inv items, we have 'air', 'other' and 'none'
+    equip = [0] * num_inv_items
+    equip[state['equipped_items']['mainhand']['type']] = 1
+    
+    # add equip type one-hot vector to inv_obs
+    inv_obs.extend(equip)
+    
+    # add inventory vector to inv_obs
+    inv_obs.extend(inv)
+    
+    return np.array(inv_obs).astype(np.float32)
+
+
 
 def loss_function(
     reward, 

@@ -6,6 +6,10 @@ from einops.layers.torch import Rearrange
 class QNetwork(nn.Module):
     def __init__(self, num_actions, inv_dim, inv_network_dim=128, inv_feature_dim=128, n_hid=64, pov_feature_dim=128, q_net_dim=128):
         super().__init__()
+        
+        # save
+        self.num_actions = num_actions
+        
         # pov feature extractor
         self.conv = nn.Sequential(
             nn.Conv2d(3, n_hid, 4, stride=2, padding=1),
