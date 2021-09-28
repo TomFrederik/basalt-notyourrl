@@ -49,8 +49,8 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
                 # choose action with highest Q value
                 with torch.no_grad():
                     q_values = q_net.forward(dict(pov=obs['pov'], inv=preprocess_non_pov_obs(obs)))
-                    # TODO
-                    raise NotImplementedError
+                    action = torch.argmax(q_values).item()
+            raise NotImplementedError #TODO
         
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
@@ -139,8 +139,13 @@ def main(env_name, train_steps, save_freq,
     inv_dim = inv_sample.shape[0]
     print(f'{inv_dim = }')
     
+    action_sample = dataset[0][3]
+    print(f'{action_sample}')
+    num_actions = len(action_sample)
+    print(f'{num_actions}')
+    
     q_net_kwargs = {
-        'num_actions':0,#TODO
+        'num_actions':num_actions,
         'inv_dim':inv_dim,
         'n_hid':n_hid,
         'pov_feature_dim':pov_feature_dim,

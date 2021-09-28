@@ -138,14 +138,18 @@ def find_cave_action(action):
     cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
                                                 PITCH_MARGIN, YAW_MARGIN,
                                                 action['left'], action['right'])
+    
     # insert shaped camera actions
     action_withcam = insert_actions(action_combined, cam_actions_shaped, 'back')
+    
     # remove actions that are not needed
     action_withcam_lean = remove_actions(
         action_withcam,
         ['attack', 'back', 'camera', 'forward', 'jump', 'left', 'right', 'sprint', 'sneak'])
+    
     # add equip action shaping
     action_withcam_lean_equipped = shape_equip(action_withcam_lean)
+    
     # combine attack-forward-jump action with camera rotation actions
     action_final = combine_actions_multi(
         action_withcam_lean_equipped,
@@ -154,9 +158,11 @@ def find_cave_action(action):
         old_keys=['camera_down', 'camera_left', 'camera_right', 'camera_up'],
         keys_to_avoid=['attack-forward-jump', 'camera_down', 'camera_left',
                        'camera_right', 'camera_up', 'equip', 'use'])
+    
     # prioritize actions
     action_final_prioritized = prioritize_actions(
         action_final, act_prior=ACTION_PRIORITIES['MineRLBasaltFindCave-v0'])
+    
     # index actions
     action_final_prioritized_indexed, index = index_actions(action_final_prioritized, 4)
 

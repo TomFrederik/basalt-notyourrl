@@ -154,12 +154,16 @@ class MemoryDataset(Dataset):
         '''
         Returns the shaped action, depending on the environment
         '''
-        return {
+        action_dict, idx = {
             'MineRLBasaltFindCave-v0':find_cave_action,
             'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
             'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
             'MineRLBasaltBuildVillageHouse-v0':build_house_action
         }[self.env_name](action)
+        
+        one_hot = np.array([map(lambda x: x[1], action_dict)]).astype(np.float32)
+        
+        return one_hot
         
     
     def _preprocess_other_obs(self, state):
@@ -200,7 +204,7 @@ class MemoryDataset(Dataset):
 
             td_errors = np.ones_like(rewards)
             
-            actions = self._preprocess_action(act)
+            actions = np.array([map(self._preprocess_action, act)])
 
             # add episode to memory
             self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id='expert')

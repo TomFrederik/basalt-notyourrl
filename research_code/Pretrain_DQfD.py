@@ -103,8 +103,13 @@ def main(env_name, pretrain_steps, save_freq,
     inv_dim = inv_sample.shape[0]
     print(f'{inv_dim = }')
     
+    action_sample = dataset[0][3]
+    print(f'{action_sample}')
+    num_actions = len(action_sample)
+    print(f'{num_actions}')
+    
     q_net_kwargs = {
-        'num_actions':0,#TODO
+        'num_actions':num_actions,
         'inv_dim':inv_dim,
         'n_hid':n_hid,
         'pov_feature_dim':pov_feature_dim,
