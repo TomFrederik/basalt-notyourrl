@@ -1,12 +1,14 @@
+# https://towardsdatascience.com/python-has-a-built-in-database-heres-how-to-use-it-47826c10648a
 import sqlite3
 from typing import List, Tuple 
+
 
 class NoUnratedPair(Exception):
     """No unrated pair found in the database"""
     pass
 
 class AnnotationBuffer:
-    def __init__(self, db_path='trajectories.db') -> None:
+    def __init__(self, db_path) -> None:
         self.conn = sqlite3.connect(db_path)
         self.c = self.conn.cursor()
         self.create_table()

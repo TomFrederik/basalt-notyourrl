@@ -1,10 +1,11 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
 import skvideo.io
 import streamlit as st
 
-import database
+from common import database, utils
 
 
 def npy_to_vid(npy_path, video_path):
@@ -18,14 +19,14 @@ def npy_to_vid(npy_path, video_path):
     writer.close()
 
 class App:
-    def __init__(self, videos_folder, npy_folder) -> None:
+    def __init__(self, db_path, videos_dir, traj_dir) -> None:
         st.set_page_config(page_title="Human preferences user interface", page_icon=None, layout='wide')
         st.title("Human preferences user interface")
 
         # TODO: Cache so Streamlit doesn't run it on every refresh
-        self.npy_dir = Path(npy_folder)
-        self.videos_dir = Path(videos_folder)
-        self.db = database.AnnotationBuffer()
+        self.npy_dir = Path(traj_dir)
+        self.videos_dir = Path(videos_dir)
+        self.db = database.AnnotationBuffer(db_path)
         self.load_css("style.css")
         return
 
@@ -54,7 +55,6 @@ class App:
         # videos will names as ids, same as in table
         # do pre-populated database in previous step that doesn't have the choices yet
         # load the pair vids from the database
-        # https://towardsdatascience.com/python-has-a-built-in-database-heres-how-to-use-it-47826c10648a
         left_id, right_id = self.db.get_one_unrated_pair()
 
         with left:
@@ -99,8 +99,16 @@ class App:
                 left_id, right_id = self.db.get_one_unrated_pair()
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Rate clips in annotation buffer')
+    parser.add_argument("-c", "--config-file", default="config.yaml",
+                        help="Initial config file. Default: %(default)s")
+    options = parser.parse_args()
+
+    cfg = utils.load_config(options.config_file)
+
     app = App(
-        videos_folder = "/tmp",
-        npy_folder = "./trajectories"
+        db_path=cfg.sampler.db_path,
+        videos_dir=cfg.rate_ui.videos_dir,
+        traj_dir=cfg.sampler.traj_dir,
     )
     app.run()
