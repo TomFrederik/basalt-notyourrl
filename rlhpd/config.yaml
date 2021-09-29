@@ -1,19 +1,33 @@
 # This is a central config file to store all configuration parameters for RLHPD.
+
+# Example usage:
+# from common import utils
+# cfg = utils.load_config("config.yaml")
+# # Returns a Munch file which is a dictionary-like object that supports
+# # attribute-style access (object.attribute.path)
+# # See: https://github.com/Infinidat/munch
+# print(cfg.out.base_dir)
+
 env_task: MineRLBasaltFindCave-v0
 demos_path: ./data
-outputs_base: ./output
-run_id: null # Autopopulate with timestamp if null; feel free to create your own ID
-# All paths with `out_` prefix will be relative to $outputs_base/$run_id
-out_log_dir: log
-out_models_dir: models
-out_annotation_db: annotation.db
-out_replay_buf_file: replay_buf.pkl
-# clip_sampler:
-# TODO: Pick params intelligently
-num_clips: 5
-clip_length: 5 # Number of frames
-max_traj_length: 10
-num_of_traj: 5
-num_of_samples: 5
-sample_length: 5
-pair_per_sample: 2
+
+out:
+    base_dir: ./output
+
+pretrain_policy:
+    model_path: ./output/Q_0.pth
+
+sampler:
+    db_path: ./output/annotation_buffer.db
+    traj_dir: ./output/trajectories/
+    rnd_seed: 0
+    num_clips: 5
+    clip_length: 5
+    max_traj_length: 10
+    num_traj: 5
+    num_samples: 5
+    sample_length: 5
+    pair_per_sample: 2
+
+rate_ui:
+    videos_dir: ./output/videos
