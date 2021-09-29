@@ -70,7 +70,7 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         if steps % save_freq == 0:
             print('Saving model...')
-            torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+            torch.save(q_net, os.path.join(log_dir, 'model.pt'))
         
         if steps % update_freq == 0:
             print('Updating target model...')
@@ -141,7 +141,7 @@ def main(env_name, pretrain_steps, save_freq,
     )
     
     print('Training finished! Saving model...')
-    torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+    torch.save(q_net, os.path.join(log_dir, 'model.pt'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

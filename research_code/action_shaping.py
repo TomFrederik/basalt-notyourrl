@@ -1,4 +1,5 @@
 import numpy as np
+import gym
 
 # angles of rotation above which we consider camera actions (TODO: arbitrary values, probably need tweaking)
 PITCH_MARGIN=5
@@ -179,3 +180,41 @@ def build_house_action(action):
 def create_pen_action(action):
     #TODO
     raise NotImplementedError
+
+def reverse_find_cave_action(action):
+    #TODO
+    raise NotImplementedError
+
+def reverse_make_waterfall_action(action):
+    #TODO
+    raise NotImplementedError
+
+def reverse_build_house_action(action):
+    #TODO
+    raise NotImplementedError
+
+def reverse_create_pen_action(action):
+    #TODO
+    raise NotImplementedError
+
+
+
+class ActionWrapper(gym.Wrapper):
+    def __init__(self, env, env_name):
+        super().__init__(env)
+        self.env = env
+        self.env_name = env_name
+        
+    def step(self, action):
+        # reverse map action one-hot to env action
+        action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action,
+            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action,
+            'MineRLBasaltCreateVillageAnimalPen-v0':reverse_create_pen_action,
+            'MineRLBasaltBuildVillageHouse-v0':reverse_build_house_action
+        }[self.env_name](action)
+
+        # take step
+        next_state, reward, done, info = self.env.step(action)
+        
+        # return stuff
+        return next_state, reward, done, info
