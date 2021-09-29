@@ -182,8 +182,77 @@ def create_pen_action(action):
     raise NotImplementedError
 
 def reverse_find_cave_action(action):
-    #TODO
-    raise NotImplementedError
+    assert isinstance(action, int), f"{type(action) = }"
+    
+    action_dict = {
+        "attack":0,
+        "back":0,
+        "camera":0,
+        "equip":0,
+        "forward":0,
+        "jump":0,
+        "left":0,
+        "right":0,
+        "sneak":0,
+        "sprint":0,
+        "use":0,
+    }
+    
+    if action == 0:
+        action_dict['attack'] = 1
+        action_dict['forward'] = 1
+        action_dict['jump'] = 1    
+        action_dict['camera'] = (PITCH_MARGIN, 0) # up
+    elif action == 1:
+        action_dict['attack'] = 1
+        action_dict['forward'] = 1
+        action_dict['jump'] = 1    
+        action_dict['camera'] = (0, YAW_MARGIN) # right
+    elif action == 2:
+        action_dict['attack'] = 1
+        action_dict['forward'] = 1
+        action_dict['jump'] = 1    
+        action_dict['camera'] = (0, -YAW_MARGIN) # left
+    elif action == 3:
+        action_dict['attack'] = 1
+        action_dict['forward'] = 1
+        action_dict['jump'] = 1    
+        action_dict['camera'] = (-PITCH_MARGIN, 0) # down
+    elif action == 4:
+        action_dict['attack'] = 1
+        action_dict['forward'] = 1
+        action_dict['jump'] = 1    
+    elif action == 5:
+        action_dict['camera'] = (-PITCH_MARGIN, 0) # down
+    elif action == 6:
+        action_dict['camera'] = (0, -YAW_MARGIN) # left
+    elif action == 7:
+        action_dict['camera'] = (0, YAW_MARGIN) # right
+    elif action == 8:
+        action_dict['camera'] = (PITCH_MARGIN, 0) # up
+    elif action == 9:
+        action_dict['equip'] = 1 # equip
+    elif action == 10:
+        action_dict['use'] = 1 # use
+    
+    """
+    action dict: 
+    OrderedDict([
+        ('afj-up', 0 or 1), 
+        ('afj-right', 0 or 1), 
+        ('afj-left', 0 or 1), 
+        ('afj-down', 0 or 1), 
+        ('attack-forward-jump', 0 or 1), 
+        ('camera_down', 0 or 1), 
+        ('camera_left', 0 or 1), 
+        ('camera_right', 0 or 1), 
+        ('camera_up', 0 or 1), 
+        ('equip', 0 or 1), 
+        ('use', 0 or 1)
+    ])
+    """
+    
+    
 
 def reverse_make_waterfall_action(action):
     #TODO
