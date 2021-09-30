@@ -44,7 +44,6 @@ def main(
         pov_list = []
 
         while not done:
-            print(f'{steps = }') # for debugging
             # save pov obs for video creation
             pov_list.append(obs['pov'])
 
@@ -69,14 +68,14 @@ def main(
             # check stopping criterion
             steps += 1
             if steps >= max_episode_len and (not done):
-                print(f'Stopping prematurely after {max_episode_len} steps')
+                print(f'Stopping prematurely')
                 break
         
-        print(f'\nFinished episode {i+1}. Creating video..\n')
+        print(f'\nFinished episode {i+1} after {steps} steps. Creating video..\n')
         out = cv2.VideoWriter(os.path.join(video_dir, f'{i}.mp4'),cv2.VideoWriter_fourcc(*'mp4v'), 25, (64,64))
 
         for i in range(len(pov_list)):
-            out.write(pov_list[i])
+            out.write(pov_list[i][:,:,::-1])
         out.release()
 
 

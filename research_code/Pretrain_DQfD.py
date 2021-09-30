@@ -50,11 +50,14 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         optimizer.zero_grad(set_to_none=True)
 
         # compute loss
-        cur_expert_action = np.max(cur_expert_action, axis=1).astype(np.int64)
+        cur_expert_action = np.argmax(np.array(cur_expert_action), axis=1).astype(np.int64)
         pre_max_q = cur_q_values + supervised_loss_margin
         pre_max_q[np.arange(len(cur_expert_action)), cur_expert_action] -= supervised_loss_margin
         J_E = torch.max(pre_max_q, dim=1)[0] - cur_q_values[np.arange(len(cur_expert_action)), cur_expert_action]
         J_E = (weight * J_E).mean()
+
+        expert_q_values = cur_q_values[np.arange(len(cur_expert_action)), cur_expert_action].mean()
+        other_q_values = cur_q_values.mean() - expert_q_values * q_net.num_actions
         
         # backward and step
         J_E.backward()
@@ -62,6 +65,9 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         # loss logging
         writer.add_scalar('Pretraining/J_E', J_E, global_step=steps)
+        writer.add_scalar('Pretraining/ExpertQValues', expert_q_values, global_step=steps)
+        writer.add_scalar('Pretraining/OtherQValues', other_q_values, global_step=steps)
+        writer.add_histogram('Pretraining/expert_actions', cur_expert_action, global_step=steps)
         
         # sample weight updating with td_error
         # (reward is always 0 in pretraining)
