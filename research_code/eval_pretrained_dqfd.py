@@ -59,7 +59,7 @@ def main(
 
             # select action
             if random.random() < epsilon:
-                action = random.randint(q_net.num_actions)
+                action = random.randint(0, q_net.num_actions)
             else:
                 action = torch.argmax(q_values).squeeze().item()
 
