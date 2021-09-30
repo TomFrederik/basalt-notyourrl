@@ -1,4 +1,7 @@
+from collections import OrderedDict
+
 import numpy as np
+import gym
 
 # angles of rotation above which we consider camera actions (TODO: arbitrary values, probably need tweaking)
 PITCH_MARGIN=5
@@ -135,7 +138,6 @@ def find_cave_action(action):
                                       keys_to_avoid=['camera', 'equip', 'left', 'right', 'use'])
     
     # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
-    print(action)
     cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
                                                 PITCH_MARGIN, YAW_MARGIN,
                                                 action['left'], action['right'])
@@ -180,3 +182,110 @@ def build_house_action(action):
 def create_pen_action(action):
     #TODO
     raise NotImplementedError
+
+def reverse_find_cave_action(action):
+    assert isinstance(action, int), f"{type(action) = }"
+    
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
+    
+    if action == 0:
+        action_dict['attack'] = np.array(1)
+        action_dict['forward'] = np.array(1)
+        action_dict['jump'] = np.array(1)    
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 1:
+        action_dict['attack'] = np.array(1)
+        action_dict['forward'] = np.array(1)
+        action_dict['jump'] = np.array(1)    
+        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 2:
+        action_dict['attack'] = np.array(1)
+        action_dict['forward'] = np.array(1)
+        action_dict['jump'] = np.array(1)    
+        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 3:
+        action_dict['attack'] = np.array(1)
+        action_dict['forward'] = np.array(1)
+        action_dict['jump'] = np.array(1)    
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 4:
+        action_dict['attack'] = np.array(1)
+        action_dict['forward'] = np.array(1)
+        action_dict['jump'] = np.array(1)    
+    elif action == 5:
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 6:
+        action_dict['camera'] = np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 7:
+        action_dict['camera'] = np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 8:
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 9:
+        action_dict['equip'] = 'snowball' # equip
+    elif action == 10:
+        action_dict['use'] = np.array(1) # use
+    
+    """
+    action dict: 
+    OrderedDict([
+        ('afj-up', 0 or 1), 
+        ('afj-right', 0 or 1), 
+        ('afj-left', 0 or 1), 
+        ('afj-down', 0 or 1), 
+        ('attack-forward-jump', 0 or 1), 
+        ('camera_down', 0 or 1), 
+        ('camera_left', 0 or 1), 
+        ('camera_right', 0 or 1), 
+        ('camera_up', 0 or 1), 
+        ('equip', 0 or 1), 
+        ('use', 0 or 1)
+    ])
+    """
+    return action_dict
+    
+
+def reverse_make_waterfall_action(action):
+    #TODO
+    raise NotImplementedError
+
+def reverse_build_house_action(action):
+    #TODO
+    raise NotImplementedError
+
+def reverse_create_pen_action(action):
+    #TODO
+    raise NotImplementedError
+
+
+
+class ActionWrapper(gym.Wrapper):
+    def __init__(self, env, env_name):
+        super().__init__(env)
+        self.env = env
+        self.env_name = env_name
+        
+    def step(self, action):
+        # reverse map action one-hot to env action
+        new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action,
+            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action,
+            'MineRLBasaltCreateVillageAnimalPen-v0':reverse_create_pen_action,
+            'MineRLBasaltBuildVillageHouse-v0':reverse_build_house_action
+        }[self.env_name](action)
+
+        # take step
+        next_state, reward, done, info = self.env.step(new_action)
+        
+        # return stuff
+        return next_state, reward, done, info

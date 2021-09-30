@@ -5,11 +5,23 @@ import numpy as np
 from torch.utils.data import Dataset
 import minerl
 import torch
+from copy import deepcopy
 
 from action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
+
+# set items for preprocessing
+# TODO: incorporate stuff for village house
+all_inv_items = ['bucket','carrot','cobblestone','fence','fence_gate','snowball','stone_pickaxe','stone_shovel','water_bucket','wheat','wheat_seeds']
+all_equip_items = ['air','bucket','carrot','cobblestone','fence','fence_gate','none','other','snowball','stone_pickaxe','stone_shovel','water_bucket','wheat','wheat_seeds']
+all_inv_items.sort()
+all_equip_items.sort()
+INV_TO_IDX = {item: i for i, item in enumerate(all_inv_items)}
+EQUIP_TO_IDX = {item: i for i, item in enumerate(all_equip_items)}
+
+
 
 class ReplayBuffer(object):
 
@@ -93,7 +105,7 @@ class CombinedMemory(object):
             return self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)]
 
     def sample(self, batch_size):
-        idcs = np.random.choice(np.arange(len(self)), size=batch_size, replace=False, p=self.weights)
+        idcs = np.random.choice(np.arange(len(self)), size=batch_size, replace=False, p=self.weights/np.sum(self.weights))
         return idcs
 
     def update_IS_exponent(self, new_IS_exponent):
@@ -135,9 +147,9 @@ class MemoryDataset(Dataset):
     
     def __getitem__(self, idx):
         state, action, next_state, reward, n_step_state, n_step_reward, td_error = self.combined_memory[idx]
-        
-        action = self._preprocess_action(action)
-        
+
+        processed_action = self._preprocess_action(action)
+
         pov = einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
         next_pov = einops.rearrange(next_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
         n_step_pov = einops.rearrange(n_step_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
@@ -151,18 +163,22 @@ class MemoryDataset(Dataset):
         
         weight = self.weights[idx]
 
-        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), action, reward, n_step_reward, idx, weight
+        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), processed_action, reward, n_step_reward, idx, weight
 
     def _preprocess_action(self, action):
         '''
         Returns the shaped action, depending on the environment
         '''
+        # very hacky but there seems to be a modification of the action going on
+        # TODO make this less hacky
+        new_action = deepcopy(action)
+ 
         action_dict, idx = {
             'MineRLBasaltFindCave-v0':find_cave_action,
             'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
             'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
             'MineRLBasaltBuildVillageHouse-v0':build_house_action
-        }[self.env_name](action)
+        }[self.env_name](new_action)
         
         one_hot = np.array([*map(lambda x: x, action_dict.values())]).astype(np.float32)
         
@@ -211,7 +227,6 @@ class MemoryDataset(Dataset):
 
         print('\nLoaded ',len(self.combined_memory.memory_dict['expert']),' expert samples!')
 
-
 def preprocess_non_pov_obs(state):
     # add damage vector to inv_obs
     inv_obs = [state['equipped_items']['mainhand']['damage'], state['equipped_items']['mainhand']['maxDamage']]
@@ -220,7 +235,7 @@ def preprocess_non_pov_obs(state):
     inv = list(state['inventory'].values())
     num_inv_items = len(inv) + 3 # in addition to inv items, we have 'air', 'other' and 'none'
     equip = [0] * num_inv_items
-    equip[state['equipped_items']['mainhand']['type']] = 1
+    equip[EQUIP_TO_IDX[state['equipped_items']['mainhand']['type']]] = 1
     
     # add equip type one-hot vector to inv_obs
     inv_obs.extend(equip)

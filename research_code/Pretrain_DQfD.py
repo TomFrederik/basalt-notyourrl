@@ -32,7 +32,14 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
-        (pov, inv), (next_pov, next_inv), _, cur_expert_action, _, _, idcs, weight = zip([dataset[idx] for idx in batch_idcs])
+        state, next_state, _, cur_expert_action, _, _, idcs, weight = zip(*[dataset[idx] for idx in batch_idcs])
+        pov, inv = zip(*state)
+        next_pov, next_inv = zip(*next_state)
+        pov = torch.from_numpy(np.array(pov))
+        inv = torch.from_numpy(np.array(inv))
+        next_pov = torch.from_numpy(np.array(next_pov))
+        next_inv = torch.from_numpy(np.array(next_inv))
+        weight = torch.from_numpy(np.array(weight))
 
         # forward pass
         cur_q_values = q_net.forward(dict(pov=pov, inv=inv))
@@ -43,10 +50,11 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         optimizer.zero_grad(set_to_none=True)
 
         # compute loss
+        cur_expert_action = np.max(cur_expert_action, axis=1).astype(np.int64)
         pre_max_q = cur_q_values + supervised_loss_margin
         pre_max_q[np.arange(len(cur_expert_action)), cur_expert_action] -= supervised_loss_margin
         J_E = torch.max(pre_max_q, dim=1)[0] - cur_q_values[np.arange(len(cur_expert_action)), cur_expert_action]
-        J_E = weight * J_E
+        J_E = (weight * J_E).mean()
         
         # backward and step
         J_E.backward()
@@ -62,7 +70,7 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         if steps % save_freq == 0:
             print('Saving model...')
-            torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+            torch.save(q_net, os.path.join(log_dir, 'model.pt'))
         
         if steps % update_freq == 0:
             print('Updating target model...')
@@ -98,15 +106,13 @@ def main(env_name, pretrain_steps, save_freq,
     )
 
     # init q net
-    inv_sample = dataset[0][0][0]
-    print(f'{inv_sample = }')
+    inv_sample = dataset[0][0][1]
     inv_dim = inv_sample.shape[0]
     print(f'{inv_dim = }')
     
     action_sample = dataset[0][3]
-    print(f'{action_sample}')
     num_actions = len(action_sample)
-    print(f'{num_actions}')
+    print(f'{num_actions = }')
     
     q_net_kwargs = {
         'num_actions':num_actions,
@@ -135,7 +141,7 @@ def main(env_name, pretrain_steps, save_freq,
     )
     
     print('Training finished! Saving model...')
-    torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+    torch.save(q_net, os.path.join(log_dir, 'model.pt'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
