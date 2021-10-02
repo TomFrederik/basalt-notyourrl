@@ -34,10 +34,11 @@ class DataBaseFiller:
     def __init__(self, cfg, env):
 
         self.env = env
-        self.rng = np.random.default_rng(cfg.sampler.rnd_seed)  # TODO JUN, is this okay here?
+        self.env_task = cfg.env_task
+        self.rng = np.random.default_rng(cfg.sampler.rnd_seed)  
         
-        self.autolabel = cfg.autolabel
-        self.autolabel_num = cfg.autolabel_per_sample
+        self.autolabel = cfg.sampler.autolabel
+        self.autolabel_num = cfg.sampler.autolabel_per_sample
         
         self.num_traj = cfg.sampler.num_traj
         self.max_traj_length = cfg.sampler.max_traj_length
@@ -45,7 +46,7 @@ class DataBaseFiller:
         self.sample_length = cfg.sampler.sample_length
         self.pair_per_sample = cfg.sampler.pair_per_sample
         self.traj_dir = Path(cfg.sampler.traj_dir)
-
+        self.demos_dir = cfg.demos_dir
         self.db_path = Path(cfg.sampler.db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = database.AnnotationBuffer(self.db_path)
@@ -91,7 +92,7 @@ class DataBaseFiller:
     def _save_all_traj_and_samples(self):
         """ Saves all the trajectories and samples as np array in a filename like 'runid_traj_x_smpl_y' """
         for traj_idx in tqdm(range(self.num_traj)):
-            trajectory = self._generate_trajectory(self.max_traj_length, self.env)
+            trajectory = self._generate_trajectory()
             traj_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_full"
             self._write_to_file(traj_path, trajectory)
 
@@ -124,9 +125,17 @@ class DataBaseFiller:
                         f"{self.run_id}_traj_{x2}_smpl_{y}"
                         )
 
-    def _get_demo_sample():
+    def _get_demo_sample(self):
         """Returns a random sample from a random demo trajectory in a numpy array"""
-    # TODO
+        minerl_data = minerl.data.make(self.env_task, data_dir=self.demos_dir)
+        traj_names = minerl_data.get_trajectory_names()
+        random_traj = np.random.choice(traj_names)
+        data_frames = list(minerl_data.load_data(random_traj, include_metadata=True))
+
+        start_idx = self.rng.integers(low=0, high=len(data_frames)-self.sample_length)
+        clip = data_frames[start_idx: start_idx + self.sample_length]
+        return clip
+
     
     def _do_autolabels(self):
         """ Pairs each newly generated sample with a random sample from the demonstrations"""

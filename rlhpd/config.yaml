@@ -9,7 +9,7 @@
 # print(cfg.out.base_dir)
 
 env_task: MineRLBasaltFindCave-v0
-demos_path: ./data
+demos_dir: ./data
 
 out:
     base_dir: ./output
