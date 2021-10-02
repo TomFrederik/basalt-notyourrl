@@ -97,7 +97,7 @@ class DataBaseFiller:
             self._write_to_file(traj_path, trajectory)
 
             for sample_idx in range(self.num_samples):
-                sample = self._generate_sample(trajectory, self.max_traj_length, self.sample_length)
+                sample = self._generate_sample(trajectory)
                 sample_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}"
                 self._write_to_file(sample_path, sample)
 
