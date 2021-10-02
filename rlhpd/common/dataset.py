@@ -9,7 +9,7 @@ import torchvision
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset, dataloader
 
-import utils
+from . import utils
 
 
 class TrajectoryPreferencesDataset(Dataset):
@@ -56,14 +56,18 @@ class TrajectoryPreferencesDataset(Dataset):
         judgement = torch.as_tensor(utils.simulate_judgement(clip_a, clip_b))
 
         # Preprocess images
-        frames_a = torch.stack([torch.as_tensor(img) for (img, action, reward) in clip_a], axis=0)
+        frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
+        vec_a = torch.stack([torch.as_tensor(state['compassAngle'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
-        frames_b = torch.stack([torch.as_tensor(img) for (img, action, reward) in clip_b], axis=0)
+        frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
+        vec_b = torch.stack([torch.as_tensor(state['compassAngle'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
 
         sample = {
             'frames_a': frames_a,
             'frames_b': frames_b,
+            'vec_a': vec_a,
+            'vec_b': vec_b,
             'judgement': judgement,
         }
         return sample
@@ -87,6 +91,8 @@ if __name__ == '__main__':
     for i_batch, sample_batched in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
         frames_a = sample_batched['frames_a']
         frames_b = sample_batched['frames_b']
+        vec_a = sample_batched['vec_a']
+        vec_b = sample_batched['vec_b']
         judgements = sample_batched['judgement']
         assert len(frames_a) == len(judgements)
 
@@ -94,4 +100,6 @@ if __name__ == '__main__':
         frames_a = sample_batched['frames_a']
         frames_b = sample_batched['frames_b']
         judgements = sample_batched['judgement']
+        vec_a = sample_batched['vec_a']
+        vec_b = sample_batched['vec_b']
         assert len(frames_a) == len(judgements)
