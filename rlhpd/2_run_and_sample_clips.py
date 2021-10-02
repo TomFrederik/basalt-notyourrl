@@ -31,13 +31,13 @@ class DataBaseFiller:
     Set autolabel if you also want your samples to be paired with num_autolabel number of 
     demonstration samples.
     """
-    def __init__(self, cfg, env, autolabel= True, autolabel_pair_per_sample=1):
+    def __init__(self, cfg, env):
 
         self.env = env
         self.rng = np.random.default_rng(cfg.sampler.rnd_seed)  # TODO JUN, is this okay here?
         
-        self.autolabel = autolabel
-        self.autolabel_num = autolabel_pair_per_sample
+        self.autolabel = cfg.autolabel
+        self.autolabel_num = cfg.autolabel_per_sample
         
         self.num_traj = cfg.sampler.num_traj
         self.max_traj_length = cfg.sampler.max_traj_length
@@ -154,10 +154,6 @@ class DataBaseFiller:
         if self.autolabel:
             self._do_autolabels()
 
-# AUTOLABELING:
-# prefer clips from demonstrations over initial trajectories
-# pair up every initial trajectory with a random sample from a demonstration
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sample clips from pretrained model')
@@ -173,7 +169,7 @@ if __name__ == '__main__':
     environment = gym.make(env_task)
     print("Done initializing environment!")
 
-    db_filler = DataBaseFiller(cfg=cfg, env=environment, autolabel= True, autolabel_pair_per_sample=1)
+    db_filler = DataBaseFiller(cfg=cfg, env=environment)
     db_filler.run()
 
     

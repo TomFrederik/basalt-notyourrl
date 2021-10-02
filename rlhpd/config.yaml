@@ -28,6 +28,8 @@ sampler:
     num_samples: 5
     sample_length: 5
     pair_per_sample: 2
+    autolabel: True
+    autolabel_per_sample: 1
 
 rate_ui:
     videos_dir: ./output/videos
