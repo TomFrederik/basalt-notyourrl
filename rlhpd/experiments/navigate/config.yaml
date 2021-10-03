@@ -6,11 +6,10 @@
 # # Returns a Munch file which is a dictionary-like object that supports
 # # attribute-style access (object.attribute.path)
 # # See: https://github.com/Infinidat/munch
-# print(cfg.out.base_dir)
+# print(cfg.my.param.value)
 
 env_task: MineRLNavigateDense-v0
 demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
-wandb_project: 'DRLfHP-navigate'
 wandb_entity: 'junshern'
 
 clips:
@@ -18,7 +17,11 @@ clips:
     clip_length: 100 # 20(?) frames per second -> 5 seconds
     num_clips: 100
 
+pref_ui:
+    videos_dir: ./output/videos
+
 reward:
+    wandb_project: DRLfHP-navigate
     save_dir: ./output/reward_models
     best_model_path: ./output/reward_models/best.pt
     # Training params
@@ -37,5 +40,15 @@ reward:
     adam_betas: [0.9, 0.999]
     adam_eps: 0.00000001 # 1e-8
 
-pref_ui:
-    videos_dir: ./output/videos
+policy:
+    wandb_project: policy-navigate
+    # Training params
+    rand_seed: 0
+    train_steps: 10000
+    gym_env: MineRLNavigateDenseVectorObf-v0
+    reward_model_path: ./output/reward_models/best.pt
+    policy_models_dir: ./output/policy_models
+    # Trajectory generation params
+    policy_path: None # ./output/policy_models/best.pt
+    num_trajectories: 20
+    out_dir: ./learned_trajectories

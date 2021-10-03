@@ -5,11 +5,10 @@ from pathlib import Path
 import einops
 import numpy as np
 import torch
-import torchvision
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from torch.utils.data import DataLoader, Dataset, dataloader
 
-from . import utils
+from . import preference_helpers as pref
 
 
 class TrajectoryPreferencesDataset(Dataset):
@@ -53,7 +52,7 @@ class TrajectoryPreferencesDataset(Dataset):
         assert len(clip_a) == len(clip_b)
 
         # Compute judgement based on rewards
-        judgement = torch.as_tensor(utils.simulate_judgement(clip_a, clip_b))
+        judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
 
         # Preprocess images
         frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)

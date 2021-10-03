@@ -130,5 +130,5 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    app = App(cfg.clips.dir, cfg.reward_model.path, cfg.pref_ui.videos_dir)
+    app = App(cfg.clips.dir, cfg.reward.best_model_path, cfg.pref_ui.videos_dir)
     app.run()
