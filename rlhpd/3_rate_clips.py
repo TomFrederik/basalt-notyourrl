@@ -1,4 +1,5 @@
 import argparse
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -8,18 +9,24 @@ import streamlit as st
 from common import database, utils
 
 
-def npy_to_vid(npy_path, video_path):
-    print(npy_path)
-    npy_array = np.load(npy_path).astype(np.uint8)
+def save_vid(pickle_path, video_path, fps):
+    print(pickle_path)
+    with open(pickle_path, 'rb') as f:
+        clip = pickle.load(f)
+    imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
 
     video_path.parent.mkdir(parents=True, exist_ok=True)    
-    writer = skvideo.io.FFmpegWriter(video_path, outputdict={'-vcodec': 'libx264'})
-    for idx in range(npy_array.shape[0]):
-        writer.writeFrame(npy_array[idx,...])
+    writer = skvideo.io.FFmpegWriter(
+        video_path, 
+        inputdict={'-r': str(fps)},
+        outputdict={'-r': str(fps), '-vcodec': 'libx264'},
+        )
+    for idx in range(imgs.shape[0]):
+        writer.writeFrame(imgs[idx,...])
     writer.close()
 
 class App:
-    def __init__(self, db_path, videos_dir, traj_dir) -> None:
+    def __init__(self, db_path, videos_dir, traj_dir, video_fps) -> None:
         st.set_page_config(page_title="Human preferences user interface", page_icon=None, layout='wide')
         st.title("Human preferences user interface")
 
@@ -27,6 +34,7 @@ class App:
         self.npy_dir = Path(traj_dir)
         self.videos_dir = Path(videos_dir)
         self.db = database.AnnotationBuffer(db_path)
+        self.video_fps = video_fps
         self.load_css("style.css")
         return
 
@@ -60,7 +68,7 @@ class App:
         with left:
             st.write(f"Video ID: `{left_id}`")
             vid_path = self.videos_dir / "left.mp4"
-            npy_to_vid(self.npy_dir / f"{left_id}.npy", vid_path)
+            save_vid(self.npy_dir / f"{left_id}.pickle", vid_path, self.video_fps)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
@@ -68,7 +76,7 @@ class App:
         with right:
             st.write(f"Video ID: `{right_id}`")
             vid_path = self.videos_dir / "right.mp4"
-            npy_to_vid(self.npy_dir / f"{right_id}.npy", vid_path)
+            save_vid(self.npy_dir / f"{right_id}.pickle", vid_path, self.video_fps)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
@@ -110,5 +118,6 @@ if __name__ == '__main__':
         db_path=cfg.sampler.db_path,
         videos_dir=cfg.rate_ui.videos_dir,
         traj_dir=cfg.sampler.traj_dir,
+        video_fps=cfg.rate_ui.video_fps,
     )
     app.run()

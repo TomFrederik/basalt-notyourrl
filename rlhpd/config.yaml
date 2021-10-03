@@ -9,7 +9,7 @@
 # print(cfg.out.base_dir)
 
 env_task: MineRLBasaltFindCave-v0
-demos_path: ./data
+demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
 
 out:
     base_dir: ./output
@@ -21,13 +21,14 @@ sampler:
     db_path: ./output/annotation_buffer.db
     traj_dir: ./output/trajectories/
     rnd_seed: 0
-    num_clips: 5
-    clip_length: 5
     max_traj_length: 10
     num_traj: 5
     num_samples: 5
     sample_length: 5
     pair_per_sample: 2
+    autolabel: True
+    autolabel_per_sample: 1
 
 rate_ui:
     videos_dir: ./output/videos
+    video_fps: 20
