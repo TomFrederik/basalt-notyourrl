@@ -31,3 +31,4 @@ sampler:
 
 rate_ui:
     videos_dir: ./output/videos
+    video_fps: 20
