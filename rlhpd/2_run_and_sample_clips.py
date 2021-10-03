@@ -7,6 +7,7 @@ Add clips (unannotated) into annotation db
 
 import argparse
 import os
+import pickle
 import random
 import time
 from pathlib import Path
@@ -39,6 +40,8 @@ class DataBaseFiller:
         
         self.autolabel = cfg.sampler.autolabel
         self.autolabel_num = cfg.sampler.autolabel_per_sample
+
+        # self.policy_model = load_policy(cfg.pretrain_policy.model_path)
         
         self.num_traj = cfg.sampler.num_traj
         self.max_traj_length = cfg.sampler.max_traj_length
@@ -54,25 +57,33 @@ class DataBaseFiller:
         self.run_id = time.strftime('%Y%m%d-%H%M%S')
 
 
-    def _step_random_policy(self):
+    def _random_policy(self, _):
         """ Stepping on a random policy"""
-        action = self.env.action_space.sample()
-        observation, _, done, _ = self.env.step(action)
-        return observation, done
+        return self.env.action_space.sample()
 
+    # def _learned_policy(self, obs):
+    #     """ Stepping policy"""
+    #     action = self.policy_model(obs)
+    #     return action
 
     def _generate_trajectory(self):
         """ Generates a trajectory with a random policy at the moment""" #TODO pass a policy in, currently random
         done = False
         observation = self.env.reset()
 
-        trajectory = np.zeros(shape=(self.max_traj_length, 64, 64, 3))
-        step_idx = 0
-        while not done and step_idx < self.max_traj_length:
-            trajectory[step_idx] = observation["pov"]
-            observation, done = self._step_random_policy()
-            step_idx += 1
+        trajectory = []
+        for _ in range(self.max_traj_length):
+            # trajectory[step_idx] = observation["pov"]
+            # observation, _, done, _ = self._step_random_policy()
+            action = self._random_policy(observation)
+            next_observation, reward, done, meta  = self.env.step(action)
+            trajectory.append((observation, action, reward, next_observation, done, meta))
+
+            observation = next_observation
+
             self.env.render()
+            if done:
+                break
         return trajectory
 
     def _generate_sample(self, trajectory):
@@ -82,23 +93,24 @@ class DataBaseFiller:
         """
         assert self.max_traj_length > self.sample_length
         starting_idx = self.rng.integers(low=0, high=self.max_traj_length-self.sample_length)
-        sample = trajectory[starting_idx:starting_idx+self.sample_length,...]
+        sample = trajectory[starting_idx : starting_idx+self.sample_length]
         return sample
 
     @staticmethod
-    def _write_to_file(path, np_array):
-        np.save(path, np_array)
+    def _write_to_file(path, trajectory):
+        with open(path, 'wb') as f:
+            pickle.dump(trajectory, f)
 
     def _save_all_traj_and_samples(self):
         """ Saves all the trajectories and samples as np array in a filename like 'runid_traj_x_smpl_y' """
         for traj_idx in tqdm(range(self.num_traj)):
             trajectory = self._generate_trajectory()
-            traj_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_full"
+            traj_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_full.pickle"
             self._write_to_file(traj_path, trajectory)
 
             for sample_idx in range(self.num_samples):
                 sample = self._generate_sample(trajectory)
-                sample_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}"
+                sample_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}.pickle"
                 self._write_to_file(sample_path, sample)
 
     def _fill_database_from_files(self):
@@ -131,6 +143,7 @@ class DataBaseFiller:
         traj_names = minerl_data.get_trajectory_names()
         random_traj = np.random.choice(traj_names)
         data_frames = list(minerl_data.load_data(random_traj, include_metadata=True))
+        # data_frames == list of (state, action, reward, next_state, done, meta)
 
         start_idx = self.rng.integers(low=0, high=len(data_frames)-self.sample_length)
         clip = data_frames[start_idx: start_idx + self.sample_length]
@@ -139,12 +152,12 @@ class DataBaseFiller:
     
     def _do_autolabels(self):
         """ Pairs each newly generated sample with a random sample from the demonstrations"""
-        for x in range(self.num_of_traj):
-            for y in range(self.num_of_samples):
-                for _ in range(self.autolabel_pair_per_sample):
+        for x in range(self.num_traj):
+            for y in range(self.num_samples):
+                for _ in range(self.autolabel_num):
                     # get a random demo sample
                     demo_sample = self._get_demo_sample()
-                    demo_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}"
+                    demo_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}.pickle"
                     # save it to a file
                     self._write_to_file(demo_path,demo_sample)
                     try: # if we picked a pair that exists we just skip
@@ -158,9 +171,12 @@ class DataBaseFiller:
 
 
     def run(self):
+        print("Generating clips from policy...")
         self._save_all_traj_and_samples()
+        print("Adding clips to database...")
         self._fill_database_from_files()
         if self.autolabel:
+            print("Adding autolabelled clips from demonstrations...")
             self._do_autolabels()
 
 

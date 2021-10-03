@@ -1,4 +1,5 @@
 import argparse
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -8,14 +9,16 @@ import streamlit as st
 from common import database, utils
 
 
-def npy_to_vid(npy_path, video_path):
-    print(npy_path)
-    npy_array = np.load(npy_path).astype(np.uint8)
+def save_vid(pickle_path, video_path):
+    print(pickle_path)
+    with open(pickle_path, 'rb') as f:
+        clip = pickle.load(f)
+    imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
 
     video_path.parent.mkdir(parents=True, exist_ok=True)    
     writer = skvideo.io.FFmpegWriter(video_path, outputdict={'-vcodec': 'libx264'})
-    for idx in range(npy_array.shape[0]):
-        writer.writeFrame(npy_array[idx,...])
+    for idx in range(imgs.shape[0]):
+        writer.writeFrame(imgs[idx,...])
     writer.close()
 
 class App:
@@ -60,7 +63,7 @@ class App:
         with left:
             st.write(f"Video ID: `{left_id}`")
             vid_path = self.videos_dir / "left.mp4"
-            npy_to_vid(self.npy_dir / f"{left_id}.npy", vid_path)
+            save_vid(self.npy_dir / f"{left_id}.pickle", vid_path)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
@@ -68,7 +71,7 @@ class App:
         with right:
             st.write(f"Video ID: `{right_id}`")
             vid_path = self.videos_dir / "right.mp4"
-            npy_to_vid(self.npy_dir / f"{right_id}.npy", vid_path)
+            save_vid(self.npy_dir / f"{right_id}.pickle", vid_path)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
