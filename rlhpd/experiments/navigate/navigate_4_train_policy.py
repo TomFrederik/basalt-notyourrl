@@ -11,9 +11,9 @@ import torch
 import wandb
 from common.reward_model import RewardModel
 from gym import spaces
-from stable_baselines3 import A2C
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
 
@@ -119,6 +119,7 @@ if __name__ == '__main__':
         return env
 
     env = DummyVecEnv([make_env])
+    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     env = VecVideoRecorder(
         env, 
         save_dir / "videos",
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     #     env = RewardModelWrapper(env, cfg.policy.reward_model_path)
 
     # if cfg.policy.policy_path is None:
-    policy_model = A2C(
+    policy_model = PPO(
         'MultiInputPolicy',
         env,
         verbose=1,
