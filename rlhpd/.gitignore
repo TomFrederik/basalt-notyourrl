@@ -1,3 +1,2 @@
 output/
-trajectories/
-trajectories.db
+wandb/

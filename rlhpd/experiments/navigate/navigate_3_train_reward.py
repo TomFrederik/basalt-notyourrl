@@ -1,22 +1,20 @@
 import argparse
-import pickle
-import random
 from pathlib import Path
 
-import einops
 import numpy as np
 import torch
 import wandb
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from tqdm import tqdm
 
-import dataset
-from reward_model import RewardModel
-import utils
+import common.preference_helpers as pref
+import common.utils as utils
+from common.dataset import TrajectoryPreferencesDataset
+from common.reward_model import RewardModel
+
 
 def get_pred_accuracy(prefer_probs, true_judgements):
-    pred_judgements = utils.probs_to_judgements(prefer_probs.detach().numpy())
+    pred_judgements = pref.probs_to_judgements(prefer_probs.detach().numpy())
     assert pred_judgements.shape == true_judgements.shape
     eq = np.all(true_judgements.numpy() == pred_judgements, axis=1)
     acc = eq.sum() / len(eq)
@@ -30,13 +28,15 @@ def evaluate_model_accuracy(reward_model, dataloader, max_batches=None, ret_rewa
     for batch_idx, batch in tqdm(enumerate(dataloader), total=tqdm_total):
         if max_batches is not None and batch_idx >= max_batches:
             break
-        frames_a, frames_b, true_judgements = \
-            batch['frames_a'], batch['frames_b'], batch['judgement']
+        frames_a, frames_b, vec_a, vec_b, true_judgements = \
+            batch['frames_a'], batch['frames_b'], \
+            batch['vec_a'], batch['vec_b'], \
+            batch['judgement']
         # Use model to predict probabilities of each judgement
-        probs, pred_rewards = utils.predict_pref_probs(reward_model, frames_a, frames_b, ret_rewards=True)
+        probs, pred_rewards = pref.predict_pref_probs(reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=True)
         all_pred_rewards.append(pred_rewards)
         # Round probabilities to the closest judgement
-        pred_judgements = utils.probs_to_judgements(probs.detach().numpy())
+        pred_judgements = pref.probs_to_judgements(probs.detach().numpy())
         assert pred_judgements.shape == true_judgements.shape
         # Compare prediction to true judgements
         eq = np.all(true_judgements.numpy() == pred_judgements, axis=1)
@@ -48,80 +48,53 @@ def evaluate_model_accuracy(reward_model, dataloader, max_batches=None, ret_rewa
         return mean_acc, all_pred_rewards
     return mean_acc
 
-def set_seeds(num):
-    torch.manual_seed(num)
-    random.seed(num)
-    np.random.seed(num)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train reward model')
-    parser.add_argument("-c", "--clips-dir", default="./output",
-                        help="Clips directory. Default: %(default)s")
-    parser.add_argument("-s", "--save-root-dir", default="./models",
-                        help="Root directory to save models. Default: %(default)s")
+    parser.add_argument("-c", "--config-file", default="config.yaml",
+                        help="Initial config file. Default: %(default)s")
     options = parser.parse_args()
 
-    wandb.init(project='DRLfHP-cartpole', entity='junshern')
-    # wandb.init(project='DRLfHP-cartpole', entity='junshern', mode="disabled")
+    # Params
+    cfg = utils.load_config(options.config_file)
 
-    save_dir = Path(options.save_root_dir) / wandb.run.name
+    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
+    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+
+    save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # The model is trained on batches of 16 segment pairs (see below), 
-    # optimized with Adam (Kingma and Ba, 2014) 
-    # with learning rate 0.0003, β1 = 0.9, β2 = 0.999, and eps = 10^−8 .
-    cfg = wandb.config
-    cfg.adam_lr = 0.0003
-    cfg.adam_betas = (0.9, 0.999)
-    cfg.adam_eps = 1e-8
-    cfg.batch_size = 16
-    cfg.max_num_pairs = None
-    cfg.rand_seed = 0
-    cfg.val_split = 0.1
-    cfg.val_every_n_batch = 100
-    cfg.save_every_n_epoch = 1
-    cfg.num_epochs = 5
-    cfg.gaussian_prior_weight = 0.1
-
-    set_seeds(cfg.rand_seed)
+    utils.set_seeds(cfg.reward.rand_seed)
 
     reward_model = RewardModel()
     wandb.watch(reward_model)
     optimizer = torch.optim.Adam(
         reward_model.parameters(),
-        lr=cfg.adam_lr,
-        betas=cfg.adam_betas,
-        eps=cfg.adam_eps)
+        lr=cfg.reward.adam_lr,
+        betas=cfg.reward.adam_betas,
+        eps=cfg.reward.adam_eps)
 
-    traj_paths = sorted([x for x in Path(options.clips_dir).glob("*.pickle")])
-
-    # Check the length of a single clip
-    with open(traj_paths[0], 'rb') as f:
-        clip = pickle.load(f)
-        cfg.clip_length = len(clip)
-
-    # resize_imgs = transforms.Compose([transforms.Resize((64, 64))])
-    full_dataset = dataset.TrajectoryPreferencesDataset(options.clips_dir)
-    val_size = int(cfg.val_split * len(full_dataset))
+    full_dataset = TrajectoryPreferencesDataset(cfg.clips.dir)
+    val_size = int(cfg.reward.val_split * len(full_dataset))
     train_size = len(full_dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
 
-    train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
-    val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
+    train_dataloader = DataLoader(train_dataset, batch_size=cfg.reward.batch_size, shuffle=True, num_workers=0)
+    val_dataloader = DataLoader(val_dataset, batch_size=cfg.reward.batch_size, shuffle=True, num_workers=0)
 
     samples_count = 0
-    for epoch in range(cfg.num_epochs):
+    for epoch in range(cfg.reward.num_epochs):
         print("Epoch", epoch)
         for batch_idx, data_batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
-            frames_a, frames_b, judgements = \
-                data_batch['frames_a'], data_batch['frames_b'], data_batch['judgement']
+            frames_a, frames_b, vec_a, vec_b, judgements = \
+                data_batch['frames_a'], data_batch['frames_b'], \
+                data_batch['vec_a'], data_batch['vec_b'], \
+                data_batch['judgement']
 
             # Run prediction pipeline
-            prefer_probs, pred_rewards = utils.predict_pref_probs(
-                reward_model, frames_a, frames_b, ret_rewards=True)
-            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.clip_length,),\
-                (pred_rewards.shape, (len(frames_a) * 2 * cfg.clip_length,))
+            prefer_probs, pred_rewards = pref.predict_pref_probs(
+                reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=True)
+            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.clips.clip_length,),\
+                (pred_rewards.shape, (len(frames_a) * 2 * cfg.clips.clip_length,))
 
             # Calculate loss:
             # This is almost CrossEntropy but slightly different because we want to support
@@ -131,7 +104,7 @@ if __name__ == '__main__':
             loss = - torch.sum(judgements * torch.log(prefer_probs))
             # An extra loss proportional to the square of the predicted rewards is added 
             # to impose a zero-mean Gaussian prior on the reward distribution.
-            loss += cfg.gaussian_prior_weight * torch.sum(pred_rewards.square())
+            loss += cfg.reward.gaussian_prior_weight * torch.sum(pred_rewards.square())
 
             optimizer.zero_grad()
             loss.backward()
@@ -143,7 +116,7 @@ if __name__ == '__main__':
                 wandb.log({"loss": loss.item()})
                 train_acc = get_pred_accuracy(prefer_probs, judgements)
                 wandb.log({"train_acc": train_acc})
-                if batch_idx % cfg.val_every_n_batch == 0:
+                if batch_idx % cfg.reward.val_every_n_batch == 0:
                     # Validation accuracy
                     val_acc, val_rewards = evaluate_model_accuracy(
                         reward_model, val_dataloader, ret_rewards=True)
@@ -154,7 +127,7 @@ if __name__ == '__main__':
             samples_count += len(frames_a)
 
         # Save model
-        if epoch % cfg.save_every_n_epoch == 0:
+        if epoch % cfg.reward.save_every_n_epoch == 0:
             save_path = save_dir / f"{samples_count:06d}.pt"
             torch.save(reward_model.state_dict(), save_path)
             print("Saved model to", save_path)
@@ -180,6 +153,5 @@ if __name__ == '__main__':
         # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
 
     # Save final model
-    save_path = save_dir / f"{samples_count:06d}.pt"
-    torch.save(reward_model.state_dict(), save_path)
+    torch.save(reward_model.state_dict(), cfg.reward.best_model_path)
     print("Saved model to", save_path)

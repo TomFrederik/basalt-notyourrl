@@ -5,11 +5,10 @@ from pathlib import Path
 import einops
 import numpy as np
 import torch
-import torchvision
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from torch.utils.data import DataLoader, Dataset, dataloader
 
-import utils
+from . import preference_helpers as pref
 
 
 class TrajectoryPreferencesDataset(Dataset):
@@ -40,9 +39,6 @@ class TrajectoryPreferencesDataset(Dataset):
     def __getitem__(self, idx):
         """
         Loads a batch of data
-        returns
-        imgs:           np.array of imgs (batch_size * 2 * clip_length)
-        judgements:     np.array of per-clip judgements (batch_size * 2)
         """
         # Load from file
         traj_path_a, traj_path_b = self.traj_path_pairs[idx]
@@ -53,17 +49,24 @@ class TrajectoryPreferencesDataset(Dataset):
         assert len(clip_a) == len(clip_b)
 
         # Compute judgement based on rewards
-        judgement = torch.as_tensor(utils.simulate_judgement(clip_a, clip_b))
+        judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
 
         # Preprocess images
-        frames_a = torch.stack([torch.as_tensor(img) for (img, action, reward) in clip_a], axis=0)
+        frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
-        frames_b = torch.stack([torch.as_tensor(img) for (img, action, reward) in clip_b], axis=0)
+        vec_a = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
+        frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
         frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
+        vec_b = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
 
         sample = {
+            # State a
             'frames_a': frames_a,
+            'vec_a': vec_a,
+            # State b
             'frames_b': frames_b,
+            'vec_b': vec_b,
+            # Preference
             'judgement': judgement,
         }
         return sample
@@ -87,6 +90,8 @@ if __name__ == '__main__':
     for i_batch, sample_batched in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
         frames_a = sample_batched['frames_a']
         frames_b = sample_batched['frames_b']
+        vec_a = sample_batched['vec_a']
+        vec_b = sample_batched['vec_b']
         judgements = sample_batched['judgement']
         assert len(frames_a) == len(judgements)
 
@@ -94,4 +99,6 @@ if __name__ == '__main__':
         frames_a = sample_batched['frames_a']
         frames_b = sample_batched['frames_b']
         judgements = sample_batched['judgement']
+        vec_a = sample_batched['vec_a']
+        vec_b = sample_batched['vec_b']
         assert len(frames_a) == len(judgements)

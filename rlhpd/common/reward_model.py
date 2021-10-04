@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -44,9 +45,17 @@ class RewardModel(nn.Module):
             
             nn.Flatten(),
             nn.Linear(256, 64),
-            nn.Linear(64, 1),
+            # nn.Linear(64, 1),
+        )
+        self.mlp = nn.Sequential(
+            nn.Linear(64 + 64, 10),
+            nn.ReLU(inplace=True),
+            nn.Linear(10, 1),
         )
 
-    def forward(self, obs):
-        out = self.conv(obs)
+    def forward(self, pov, vec):
+        hid = self.conv(pov)
+        out = self.mlp(
+            torch.cat([hid, vec], dim=1)
+        )
         return out
