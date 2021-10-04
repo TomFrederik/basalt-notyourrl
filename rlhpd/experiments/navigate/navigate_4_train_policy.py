@@ -12,6 +12,8 @@ import wandb
 from common.reward_model import RewardModel
 from gym import spaces
 from stable_baselines3 import A2C
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
 
@@ -97,31 +99,58 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    wandb.init(project=cfg.policy.wandb_project, entity=cfg.wandb_entity)
-    # wandb.init(project=cfg.policy.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+    wandb.init(
+        project=cfg.policy.wandb_project,
+        entity=cfg.wandb_entity,
+        sync_tensorboard=True, # auto-upload sb3's tensorboard metrics
+        monitor_gym=True, # auto-upload the videos of agents playing the game
+        # mode="disabled",
+    )
 
     save_dir = Path(cfg.policy.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
 
     utils.set_seeds(cfg.policy.rand_seed)
 
-    env = gym.make(cfg.env_task)
-    env = ActionWrapper(env)
+    def make_env():
+        env = gym.make(cfg.env_task)
+        env = Monitor(env)  # record stats such as returns
+        env = ActionWrapper(env)
+        return env
+
+    env = DummyVecEnv([make_env])
+    env = VecVideoRecorder(
+        env, 
+        save_dir / "videos",
+        record_video_trigger=lambda x: x % 5000 == 0, 
+        video_length=200,
+    )
     # if cfg.policy.reward_model_path is not None:
     #     env = RewardModelWrapper(env, cfg.policy.reward_model_path)
 
-    if cfg.policy.policy_path is None:
-        policy_model = A2C('MultiInputPolicy', env, verbose=1)
-        print("Training policy")
-        policy_model.learn(total_timesteps=cfg.policy.train_steps, callback=WandbCallback())
-        policy_model_path = save_dir / "policy"
-        policy_model.save(policy_model_path)
-    else:
-        # Skip training if the user has already specified a policy
-        policy_model_path = cfg.policy.policy_path
-        print("Skipping training. Loading policy from", policy_model_path)
+    # if cfg.policy.policy_path is None:
+    policy_model = A2C(
+        'MultiInputPolicy',
+        env,
+        verbose=1,
+        tensorboard_log=save_dir / "logs",
+        )
+    print("Training policy")
+    policy_model.learn(
+        total_timesteps=cfg.policy.train_steps,
+        callback=WandbCallback(
+            model_save_path=save_dir / "models",
+            verbose=2,
+        )
+    )
+    policy_model_path = save_dir / "models/best"
+    policy_model.save(policy_model_path)
+    # else:
+    #     # Skip training if the user has already specified a policy
+    #     policy_model_path = cfg.policy.policy_path
+    #     print("Skipping training. Loading policy from", policy_model_path)
 
-    print("Generating trajectories")
-    num_traj = cfg.policy.num_trajectories
-    out_dir = Path(cfg.policy.out_dir) / wandb.run.name
-    generate_trajectories(policy_model_path, env, num_traj, out_dir)
+    # print("Generating trajectories")
+    # num_traj = cfg.policy.num_trajectories
+    # out_dir = Path(cfg.policy.out_dir) / wandb.run.name
+    # generate_trajectories(policy_model_path, env, num_traj, out_dir)

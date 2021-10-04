@@ -43,11 +43,14 @@ reward:
 policy:
     wandb_project: policy-navigate
     reward_model_path: ./output/reward_models/summer-donkey-5/017820.pt
-    save_dir: ./output/policy_models
+    save_dir: ./output/policy/
     # Training params
     rand_seed: 0
-    train_steps: 10000
-    # Trajectory generation params
-    policy_path: null # ./output/policy_models/best.pt
-    num_trajectories: 20
-    out_dir: ./output/learned_trajectories
+    train_steps: 100000
+    # Logging params
+    save_video_every_n_steps: 5000
+    save_video_length: 200
+    # # Trajectory generation params
+    # policy_path: null # ./output/policy_models/best.pt
+    # num_trajectories: 20
+    # out_dir: ./output/learned_trajectories
