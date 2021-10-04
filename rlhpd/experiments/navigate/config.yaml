@@ -8,7 +8,7 @@
 # # See: https://github.com/Infinidat/munch
 # print(cfg.my.param.value)
 
-env_task: MineRLNavigateDense-v0
+env_task: MineRLNavigateDenseVectorObf-v0
 demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
 wandb_entity: 'junshern'
 
@@ -26,11 +26,11 @@ reward:
     best_model_path: ./output/reward_models/best.pt
     # Training params
     rand_seed: 1
-    max_num_pairs: None
+    max_num_pairs: null
     val_split: 0.1
     val_every_n_batch: 100
     save_every_n_epoch: 1
-    num_epochs: 10
+    num_epochs: 5
     gaussian_prior_weight: 0.1
     # The model is trained on batches of 16 segment pairs (see below), 
     # optimized with Adam (Kingma and Ba, 2014) 
@@ -42,13 +42,12 @@ reward:
 
 policy:
     wandb_project: policy-navigate
+    reward_model_path: ./output/reward_models/summer-donkey-5/017820.pt
+    save_dir: ./output/policy_models
     # Training params
     rand_seed: 0
     train_steps: 10000
-    gym_env: MineRLNavigateDenseVectorObf-v0
-    reward_model_path: ./output/reward_models/best.pt
-    policy_models_dir: ./output/policy_models
     # Trajectory generation params
-    policy_path: None # ./output/policy_models/best.pt
+    policy_path: null # ./output/policy_models/best.pt
     num_trajectories: 20
-    out_dir: ./learned_trajectories
+    out_dir: ./output/learned_trajectories

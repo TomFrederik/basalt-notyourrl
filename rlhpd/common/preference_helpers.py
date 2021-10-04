@@ -26,17 +26,19 @@ def probs_to_judgements(probs_array):
 
 def predict_pref_probs(reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=False):
     clip_length = frames_a.shape[1] # shape is (b, t, c, w, h)
+    vec_length = vec_a.shape[2] # shape is (b, t, v)
     current_batch_size = len(frames_a) # == cfg.batch_size except at the end of the dataset
 
     batch_imgs = torch.stack([frames_a, frames_b], axis=1)
     batch_vecs = torch.stack([vec_a, vec_b], axis=1)
     assert batch_imgs.shape == (current_batch_size, 2, clip_length, 3, 64, 64)
+    assert batch_vecs.shape == (current_batch_size, 2, clip_length, vec_length)
     
     # Flatten the (batch, Trajectory, time) dimensions to feed B,C,W,H into CNN
     batch_imgs = einops.rearrange(batch_imgs, 'b T t c w h -> (b T t) c w h')
-    batch_vecs = einops.rearrange(batch_vecs, 'b T t -> (b T t) 1')
+    batch_vecs = einops.rearrange(batch_vecs, 'b T t v -> (b T t) v')
     assert batch_imgs.shape == (current_batch_size * 2 * clip_length, 3, 64, 64)
-    assert batch_vecs.shape == (current_batch_size * 2 * clip_length, 1)
+    assert batch_vecs.shape == (current_batch_size * 2 * clip_length, vec_length)
 
     # Predict reward of every frame in our batch
     r_preds = reward_model(

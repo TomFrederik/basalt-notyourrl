@@ -39,9 +39,6 @@ class TrajectoryPreferencesDataset(Dataset):
     def __getitem__(self, idx):
         """
         Loads a batch of data
-        returns
-        imgs:           np.array of imgs (batch_size * 2 * clip_length)
-        judgements:     np.array of per-clip judgements (batch_size * 2)
         """
         # Load from file
         traj_path_a, traj_path_b = self.traj_path_pairs[idx]
@@ -56,17 +53,20 @@ class TrajectoryPreferencesDataset(Dataset):
 
         # Preprocess images
         frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-        vec_a = torch.stack([torch.as_tensor(state['compassAngle'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
+        vec_a = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
-        vec_b = torch.stack([torch.as_tensor(state['compassAngle'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
+        vec_b = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
 
         sample = {
+            # State a
             'frames_a': frames_a,
-            'frames_b': frames_b,
             'vec_a': vec_a,
+            # State b
+            'frames_b': frames_b,
             'vec_b': vec_b,
+            # Preference
             'judgement': judgement,
         }
         return sample

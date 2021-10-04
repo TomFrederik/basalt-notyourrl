@@ -48,7 +48,7 @@ class RewardModel(nn.Module):
             # nn.Linear(64, 1),
         )
         self.mlp = nn.Sequential(
-            nn.Linear(64 + 1, 10),
+            nn.Linear(64 + 64, 10),
             nn.ReLU(inplace=True),
             nn.Linear(10, 1),
         )
