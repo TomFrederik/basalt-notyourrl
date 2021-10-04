@@ -4,17 +4,24 @@ import numpy as np
 import gym
 
 # angles of rotation above which we consider camera actions (TODO: arbitrary values, probably need tweaking)
-PITCH_MARGIN=5
-YAW_MARGIN=5
+PITCH_MARGIN=10
+YAW_MARGIN=10
+
 # action priorities for each task
-ACTION_PRIORITIES = {
+'''ACTION_PRIORITIES = {
     'MineRLBasaltFindCave-v0': {
         'attack-forward-jump': 0, 'camera_down': 1, 'camera_left': 1,
         'camera_right': 1, 'camera_up': 1, 'afj-down': 2, 'afj-left': 2,
         'afj-right': 2, 'afj-up': 2, 'equip': 3, 'use': 4
     }
 }
-
+'''
+ACTION_PRIORITIES = {
+    'MineRLBasaltFindCave-v0': {
+        'attack':0, 'forward':0, 'jump': 0, 'camera_down': 1, 'camera_left': 1,
+        'camera_right': 1, 'camera_up': 1, 'equip': 3, 'use': 4
+    }
+}
 
 
 '''
@@ -134,9 +141,16 @@ def index_actions(actions, default):
 
 def find_cave_action(action):
     # combine attack, forward and jump into a single action
+
+    '''
     action_combined = combine_actions(action, ref_key='forward', new_key='attack-forward-jump',
                                       keys_to_avoid=['camera', 'equip', 'left', 'right', 'use'])
-    
+    '''
+    '''
+    action_combined = combine_actions(action, ref_key='forward', new_key='forward-jump',
+                                      keys_to_avoid=['camera', 'equip', 'left', 'right', 'use', 'attack'])
+    '''
+    action_combined = action
     # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
     cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
                                                 PITCH_MARGIN, YAW_MARGIN,
@@ -146,14 +160,18 @@ def find_cave_action(action):
     action_withcam = insert_actions(action_combined, cam_actions_shaped, 'back')
     
     # remove actions that are not needed
+    '''action_withcam_lean = remove_actions(
+        action_withcam,
+        ['attack', 'back', 'camera', 'forward', 'jump', 'left', 'right', 'sprint', 'sneak'])'''
     action_withcam_lean = remove_actions(
         action_withcam,
-        ['attack', 'back', 'camera', 'forward', 'jump', 'left', 'right', 'sprint', 'sneak'])
-    
+        ['back', 'camera', 'left', 'right', 'sprint', 'sneak'])
+
     # add equip action shaping
     action_withcam_lean_equipped = shape_equip(action_withcam_lean)
     
     # combine attack-forward-jump action with camera rotation actions
+    '''
     action_final = combine_actions_multi(
         action_withcam_lean_equipped,
         ref_key='attack-forward-jump',
@@ -161,14 +179,15 @@ def find_cave_action(action):
         old_keys=['camera_down', 'camera_left', 'camera_right', 'camera_up'],
         keys_to_avoid=['attack-forward-jump', 'camera_down', 'camera_left',
                        'camera_right', 'camera_up', 'equip', 'use'])
-    
+    '''
+    action_final = action_withcam_lean_equipped
+
     # prioritize actions
     action_final_prioritized = prioritize_actions(
         action_final, act_prior=ACTION_PRIORITIES['MineRLBasaltFindCave-v0'])
     
     # index actions
     action_final_prioritized_indexed, index = index_actions(action_final_prioritized, 4)
-
     return action_final_prioritized_indexed, index
 
 def make_waterfall_action(action):
@@ -202,56 +221,35 @@ def reverse_find_cave_action(action):
     
     if action == 0:
         action_dict['attack'] = np.array(1)
-        action_dict['forward'] = np.array(1)
-        action_dict['jump'] = np.array(1)    
-        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
     elif action == 1:
-        action_dict['attack'] = np.array(1)
-        action_dict['forward'] = np.array(1)
-        action_dict['jump'] = np.array(1)    
-        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
     elif action == 2:
-        action_dict['attack'] = np.array(1)
-        action_dict['forward'] = np.array(1)
-        action_dict['jump'] = np.array(1)    
-        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
-    elif action == 3:
-        action_dict['attack'] = np.array(1)
-        action_dict['forward'] = np.array(1)
-        action_dict['jump'] = np.array(1)    
-        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
-    elif action == 4:
-        action_dict['attack'] = np.array(1)
-        action_dict['forward'] = np.array(1)
-        action_dict['jump'] = np.array(1)    
-    elif action == 5:
-        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
-    elif action == 6:
         action_dict['camera'] = np.array([0, -YAW_MARGIN]).astype(np.float32) # left
-    elif action == 7:
+    elif action == 3:
         action_dict['camera'] = np.array([0, YAW_MARGIN]).astype(np.float32) # right
-    elif action == 8:
+    elif action == 4:
         action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
-    elif action == 9:
+    elif action == 5:
         action_dict['equip'] = 'snowball' # equip
-    elif action == 10:
+    elif action == 6:
+        action_dict['forward'] = np.array(1) 
+    elif action == 7:
+        action_dict['jump'] = np.array(1) 
+    elif action == 8:
         action_dict['use'] = np.array(1) # use
     
     """
     action dict: 
     OrderedDict([
-        ('afj-up', 0 or 1), 
-        ('afj-right', 0 or 1), 
-        ('afj-left', 0 or 1), 
-        ('afj-down', 0 or 1), 
-        ('attack-forward-jump', 0 or 1), 
-        ('camera_down', 0 or 1), 
-        ('camera_left', 0 or 1), 
-        ('camera_right', 0 or 1), 
-        ('camera_up', 0 or 1), 
-        ('equip', 0 or 1), 
-        ('use', 0 or 1)
-    ])
+        0('attack', 0), 
+        1('camera_down', 0), 
+        2('camera_left', 0), 
+        3('camera_right', 0), 
+        4('camera_up', 0), 
+        5('equip', 0), 
+        6('forward', 1), 
+        7('jump', 0), 
+        8('use', 0)])
     """
     return action_dict
     
