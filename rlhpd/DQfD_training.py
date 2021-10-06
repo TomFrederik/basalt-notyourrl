@@ -17,6 +17,14 @@ import wandb
 from common.DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs, RewardWrapper, StateWrapper
 from common.DQfD_models import QNetwork
 
+class DummyRewardModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, obs, vec):
+        return torch.zeros_like(vec)[:,0]
+
+
 def train(
     log_dir, 
     new_model_path,
@@ -157,12 +165,15 @@ def train(
                 target_q_net = deepcopy(q_net)
                 
     return q_net
-
+    
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq):
     
     wandb.init('DQfD_training')
+    
+    if reward_model_path is None:
+        print('\nWARNING!: DummyRewardModel will be used! If you are not currently debugging, you should change that!\n')
     
     # set save dir
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
@@ -176,7 +187,10 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     q_net = torch.load(model_path)
 
     # load reward model
-    reward_model = torch.load(reward_model_path)
+    if reward_model_path is None:
+        reward_model = DummyRewardModel()
+    else:
+        reward_model = torch.load(reward_model_path)
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -221,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--new_model_path', type=str, required=True)
-    parser.add_argument('--reward_model_path', type=str, required=True)
+    parser.add_argument('--reward_model_path', type=str, default=None)#, required=True)
     parser.add_argument('--num_expert_episodes', type=int, default=100)
     parser.add_argument('--n_step', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
