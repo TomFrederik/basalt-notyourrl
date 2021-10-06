@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops.layers.torch import Rearrange
 
 class QNetwork(nn.Module):
-    def __init__(self, num_actions, inv_dim, inv_network_dim=128, inv_feature_dim=128, n_hid=64, pov_feature_dim=128, q_net_dim=128):
+    def __init__(self, num_actions, vec_dim, vec_network_dim=128, vec_feature_dim=128, n_hid=64, pov_feature_dim=128, q_net_dim=128):
         super().__init__()
         
         # save
@@ -26,18 +26,18 @@ class QNetwork(nn.Module):
         
         # feature extractor for other observations
         # expects that those other observations are already stacked into a float tensor
-        self.inv_network = nn.Sequential(
-            nn.Linear(inv_dim, inv_network_dim),
+        self.vec_network = nn.Sequential(
+            nn.Linear(vec_dim, vec_network_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(inv_network_dim, inv_network_dim),
+            nn.Linear(vec_network_dim, vec_network_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(inv_network_dim, inv_feature_dim),
+            nn.Linear(vec_network_dim, vec_feature_dim),
             nn.ReLU(inplace=True)
         )
         
         # final q network
         self.q_net = nn.Sequential(
-            nn.Linear(pov_feature_dim + inv_feature_dim, q_net_dim),
+            nn.Linear(pov_feature_dim + vec_feature_dim, q_net_dim),
             nn.ReLU(inplace=True),
             nn.Linear(q_net_dim, q_net_dim),
             nn.ReLU(inplace=True),
@@ -49,10 +49,10 @@ class QNetwork(nn.Module):
         pov_features = self.conv(obs['pov'])
         
         # preprocess other observations
-        inv_features = self.inv_network(obs['inv'])
+        vec_features = self.vec_network(obs['vec'])
         
         # concat inputs
-        q_net_input = torch.cat([pov_features, inv_features], dim=1)
+        q_net_input = torch.cat([pov_features, vec_features], dim=1)
         
         return self.q_net(q_net_input)
     

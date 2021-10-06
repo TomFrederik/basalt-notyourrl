@@ -1,11 +1,13 @@
 import random
 from collections import deque, namedtuple
+from copy import deepcopy
+
 import einops
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 import minerl
-import torch
-from copy import deepcopy
+import gym
 
 from action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
 
@@ -119,6 +121,15 @@ class CombinedMemory(object):
                 self.memory_dict['agent'].memory[idx - len(self.memory_dict['expert'])]._replace(td_error=td_errors[i])
         
         self._update_weights()
+        
+    def add_agent_transition(self, transition):
+        '''
+        transition should be a tuple:
+        ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error')
+        '''
+        assert len(transition) == 7
+        self.memory_dict['agent'].push(*transition)
+        
 
  
 class MemoryDataset(Dataset):
@@ -227,6 +238,13 @@ class MemoryDataset(Dataset):
 
         print('\nLoaded ',len(self.combined_memory.memory_dict['expert']),' expert samples!')
 
+    def add_agent_transition(self, transition):
+        '''
+        transition should be a tuple:
+        ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error')
+        '''
+        self.combined_memory.add_agent_transition(transition)
+
 def preprocess_non_pov_obs(state):
     # add damage vector to inv_obs
     inv_obs = [state['equipped_items']['mainhand']['damage'], state['equipped_items']['mainhand']['maxDamage']]
@@ -270,15 +288,24 @@ def loss_function(
     loss = J_DQ + J_E + J_n
     return loss
 
+class StateWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__()
+        self.env = env
+        
+    def observation(self, obs):
+        return {'pov':obs['pov'], 'vec':preprocess_non_pov_obs(obs)}
 
-class EnvironmentWrapper(gym.Wrapper):
+class RewardWrapper(gym.Wrapper):
     def __init__(self, env, reward_model):
         super().__init__()
         self.env = env
         self.reward_model = reward_model
     
     def step(self, action):
-        next_state, reward, done, info = env.step(action)
-        reward = self.reward_model(next_state) # TODO: needs to be adapted to properly fit reward model I/O behaviour
+        next_state, reward, done, info = self.env.step(action)
+
+        reward = self.reward_model(next_state['pov'], next_state['vec'])
+        
         return next_state, reward, done, info
 
