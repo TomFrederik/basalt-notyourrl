@@ -11,10 +11,33 @@ ACTION_PRIORITIES = {
     'MineRLBasaltFindCave-v0': {
         'attack-forward-jump': 0, 'camera_down': 1, 'camera_left': 1,
         'camera_right': 1, 'camera_up': 1, 'afj-down': 2, 'afj-left': 2,
-        'afj-right': 2, 'afj-up': 2, 'equip': 3, 'use': 4
-    }
+        'afj-right': 2, 'afj-up': 2, 'equip_snowball': 3, 'use': 4
+    },
 }
 
+ACTION_PRIORITIES_SIMPLE = {
+    'MineRLBasaltFindCave-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_snowball': 6, 'use': 7
+    },
+    'MineRLBasaltMakeWaterfall-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_water_bucket': 6, 'equip_cobblestone': 6, 'equip_bucket': 6,
+        'equip_stone_shovel': 6, 'equip_stone_pickaxe': 6,
+        'equip_snowball': 7, 'use': 8
+    },
+}
+
+INVENTORY = {
+    'MineRLBasaltFindCave-v0': [
+            'snowball'
+    ],
+    'MineRLBasaltMakeWaterfall-v0': [
+        'snowball', 'water_bucket', 'cobblestone', 'bucket', 'stone_shovel', 'stone_pickaxe'
+    ],
+}
 
 
 '''
@@ -99,14 +122,15 @@ def combine_actions_multi(actions, ref_key, new_keys, old_keys, keys_to_avoid):
 
     return actions
 
-def shape_equip(actions):
+def shape_equip(actions, inventory):
     '''
     Shape the equip action space
     '''
-    actions['equip'] = 0 if (actions['equip'] == 'none') else 1
-    # TODO: extend to rest of items and tasks
+    new_actions = {f'equip_{item}':0 for item in inventory}
+    for k, item in zip(new_actions, inventory):
+        new_actions[k] = 1 if (actions['equip'] == item) else 0
 
-    return actions
+    return new_actions
 
 def prioritize_actions(actions, act_prior):
     '''
@@ -136,38 +160,107 @@ def find_cave_action(action):
     # combine attack, forward and jump into a single action
     action_combined = combine_actions(action, ref_key='forward', new_key='attack-forward-jump',
                                       keys_to_avoid=['camera', 'equip', 'left', 'right', 'use'])
-    
+
     # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
     cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
                                                 PITCH_MARGIN, YAW_MARGIN,
                                                 action['left'], action['right'])
-    
+
     # insert shaped camera actions
-    action_withcam = insert_actions(action_combined, cam_actions_shaped, 'back')
-    
-    # remove actions that are not needed
-    action_withcam_lean = remove_actions(
-        action_withcam,
-        ['attack', 'back', 'camera', 'forward', 'jump', 'left', 'right', 'sprint', 'sneak'])
-    
+    action_withcam = insert_actions(
+        action_combined, cam_actions_shaped, 'back')
+
     # add equip action shaping
-    action_withcam_lean_equipped = shape_equip(action_withcam_lean)
-    
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltFindCave-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'camera'
+    )
+
+    # remove actions that are not needed
+    action_lean = remove_actions(
+        action_withcam_equipped,
+        ['attack', 'back', 'camera', 'equip', 'forward', 'jump', 'left', 'right', 'sprint', 'sneak'])
+
     # combine attack-forward-jump action with camera rotation actions
     action_final = combine_actions_multi(
-        action_withcam_lean_equipped,
+        action_lean,
         ref_key='attack-forward-jump',
         new_keys=['afj-down', 'afj-left', 'afj-right', 'afj-up'],
         old_keys=['camera_down', 'camera_left', 'camera_right', 'camera_up'],
         keys_to_avoid=['attack-forward-jump', 'camera_down', 'camera_left',
                        'camera_right', 'camera_up', 'equip', 'use'])
-    
+
     # prioritize actions
     action_final_prioritized = prioritize_actions(
         action_final, act_prior=ACTION_PRIORITIES['MineRLBasaltFindCave-v0'])
-    
+
     # index actions
-    action_final_prioritized_indexed, index = index_actions(action_final_prioritized, 4)
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 4)  # 4 is index for attack-forward-jump
+
+    return action_final_prioritized_indexed, index
+
+def find_cave_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltFindCave-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltFindCave-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for "move forward"
+
+    return action_final_prioritized_indexed, index
+
+
+
+def make_waterfall_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltMakeWaterfall-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltMakeWaterfall-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for "move forward"
 
     return action_final_prioritized_indexed, index
 
@@ -255,10 +348,140 @@ def reverse_find_cave_action(action):
     """
     return action_dict
     
+def reverse_find_cave_action_simple(action):
+    # assert isinstance(action, int), f"{type(action) = }"
+    
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
+    
+    if action == 0:
+        action_dict['attack'] = np.array(1)
+    elif action == 1:
+        action_dict['back'] = np.array(1)
+    elif action == 2:
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 3:
+        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 4:
+        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 5:
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 6:
+        action_dict['forward'] = np.array(1)
+    elif action == 7:
+        action_dict['equip'] = 'snowball' # equip
+    elif action == 8:
+        action_dict['jump'] = np.array(1)
+    elif action == 9:
+        action_dict['left'] = np.array(1)
+    elif action == 10:
+        action_dict['right'] = np.array(1)
+    elif action == 11:
+        action_dict['use'] = np.array(1) # use
+    
+    """
+    action dict: 
+    OrderedDict([
+        ('attack', 0),
+        ('back', 0),
+        ('camera_down', 0),
+        ('camera_left', 0),
+        ('camera_right', 0),
+        ('camera_up', 0),
+        ('forward', 0),
+        ('equip_snowball', 0),
+        ('jump', 0),
+        ('left', 0),
+        ('right', 0),
+        ('use', 0)])
+    ])
+    """
+    return action_dict
 
-def reverse_make_waterfall_action(action):
-    #TODO
-    raise NotImplementedError
+def reverse_make_waterfall_action_simple(action):
+    # assert isinstance(action, int), f"{type(action) = }"
+
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
+
+    if action == 0:
+        action_dict['attack'] = np.array(1)
+    elif action == 1:
+        action_dict['back'] = np.array(1)
+    elif action == 2:
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 3:
+        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 4:
+        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 5:
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 6:
+        action_dict['forward'] = np.array(1)
+    elif action == 7:
+        action_dict['equip'] = 'snowball' # equip
+    elif action == 8:
+        action_dict['equip'] = 'water_bucket' # equip
+    elif action == 9:
+        action_dict['equip'] = 'cobblestone' # equip
+    elif action == 10:
+        action_dict['equip'] = 'bucket' # equip
+    elif action == 11:
+        action_dict['equip'] = 'stone_shovel' # equip
+    elif action == 12:
+        action_dict['equip'] = 'stone_pickaxe' # equip
+    elif action == 13:
+        action_dict['jump'] = np.array(1)
+    elif action == 14:
+        action_dict['left'] = np.array(1)
+    elif action == 15:
+        action_dict['right'] = np.array(1)
+    elif action == 16:
+        action_dict['use'] = np.array(1) # use
+    
+    """
+    OrderedDict([
+        ('attack', 0),
+        ('back', 0),
+        ('camera_down', 0),
+        ('camera_left', 0),
+        ('camera_right', 0),
+        ('camera_up', 0),
+        ('forward', 0),
+        ('equip_snowball', 0),
+        ('equip_water_bucket', 0),
+        ('equip_cobblestone', 0),
+        ('equip_bucket', 0),
+        ('equip_stone_shovel', 0),
+        ('equip_stone_pickaxe', 0),
+        ('jump', 0),
+        ('left', 0),
+        ('right', 0),
+        ('use', 0)
+    ])
+    """
 
 def reverse_build_house_action(action):
     #TODO
