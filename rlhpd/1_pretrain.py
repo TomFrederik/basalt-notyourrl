@@ -8,8 +8,7 @@ from pathlib import Path
 
 from common import utils
 
-# TODO: adapt when changing location of DQfD
-from research_code.Pretrain_DQfD import main
+from Pretrain_DQfD import main
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run behavioral cloning pretraining with expert demos')
