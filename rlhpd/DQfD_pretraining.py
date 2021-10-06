@@ -10,10 +10,10 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from torch.utils.tensorboard import SummaryWriter
+import wandb
 
-from DQfD_utils import MemoryDataset
-from DQfD_models import QNetwork
+from common.DQfD_utils import MemoryDataset
+from common.DQfD_models import QNetwork
 
 def pretrain(
     log_dir, 
@@ -30,9 +30,6 @@ def pretrain(
     update_freq
 ):
     
-    # init tensorboard writer
-    writer = SummaryWriter(log_dir)
-    
     # init optimizer
     optimizer = torch.optim.AdamW(q_net.parameters(), lr=lr, weight_decay=weight_decay)
     
@@ -46,18 +43,18 @@ def pretrain(
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
         state, next_state, _, cur_expert_action, _, _, idcs, weight = zip(*[dataset[idx] for idx in batch_idcs])
-        pov, inv = zip(*state)
-        next_pov, next_inv = zip(*next_state)
+        pov, vec = zip(*state)
+        next_pov, next_vec = zip(*next_state)
         pov = torch.from_numpy(np.array(pov))
-        inv = torch.from_numpy(np.array(inv))
+        vec = torch.from_numpy(np.array(vec))
         next_pov = torch.from_numpy(np.array(next_pov))
-        next_inv = torch.from_numpy(np.array(next_inv))
+        next_vec = torch.from_numpy(np.array(next_vec))
         weight = torch.from_numpy(np.array(weight))
 
         # forward pass
-        cur_q_values = q_net.forward(dict(pov=pov, inv=inv))
+        cur_q_values = q_net.forward(dict(pov=pov, vec=vec))
         with torch.no_grad():
-            next_q_values = target_q_net.forward(dict(pov=next_pov, inv=next_inv))
+            next_q_values = target_q_net.forward(dict(pov=next_pov, vec=next_vec))
         
         # zero gradients
         optimizer.zero_grad(set_to_none=True)
@@ -77,10 +74,14 @@ def pretrain(
         optimizer.step()
         
         # loss logging
-        writer.add_scalar('Pretraining/J_E', J_E, global_step=steps)
-        writer.add_scalar('Pretraining/ExpertQValues', expert_q_values, global_step=steps)
-        writer.add_scalar('Pretraining/OtherQValues', other_q_values, global_step=steps)
-        writer.add_histogram('Pretraining/expert_actions', cur_expert_action, global_step=steps)
+        log_dict = {
+            'Pretraining/J_E':J_E,
+            'Pretraining/ExpertQValues': expert_q_values,
+            'Pretraining/OtherQValues': other_q_values,
+            'Pretraining/expert_actions': wandb.Histogram(cur_expert_action),
+            'Pretraining/Step': steps
+        }
+        wandb.log(log_dict)
         
         # sample weight updating with td_error
         # (reward is always 0 in pretraining)
@@ -98,16 +99,19 @@ def pretrain(
     return q_net
 
 def main(env_name, pretrain_steps, save_freq, model_path,
-         lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
+         lr, horizon, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
-         pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
+         pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, update_freq):
+    
+    wandb.init(project="DQfD_pretraining")
     
     # set save dir
-    # TODO: save config in file path?
+    # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
     if model_path is None:
         model_path = os.path.join(log_dir, 'Q_0.pth')
     os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(model_path), exist_ok=True) # TODO make this prettier
     
     # set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -115,8 +119,8 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
     dataset = MemoryDataset(
-        agent_memory_capacity,
-        n_step,
+        0, #agent_memory_capacity is not needed
+        horizon,
         discount_factor,
         p_offset,
         PER_exponent,
@@ -127,9 +131,9 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     )
 
     # init q net
-    inv_sample = dataset[0][0][1]
-    inv_dim = inv_sample.shape[0]
-    print(f'{inv_dim = }')
+    vec_sample = dataset[0][0][1]
+    vec_dim = vec_sample.shape[0]
+    print(f'{vec_dim = }')
     
     action_sample = dataset[0][3]
     num_actions = len(action_sample)
@@ -137,11 +141,11 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     
     q_net_kwargs = {
         'num_actions':num_actions,
-        'inv_dim':inv_dim,
+        'vec_dim':vec_dim,
         'n_hid':n_hid,
         'pov_feature_dim':pov_feature_dim,
-        'inv_feature_dim':inv_feature_dim,
-        'inv_network_dim':inv_network_dim,
+        'vec_feature_dim':vec_feature_dim,
+        'vec_network_dim':vec_network_dim,
         'q_net_dim':q_net_dim
     }
     q_net = QNetwork(**q_net_kwargs)
@@ -172,9 +176,10 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--num_expert_episodes', type=int, default=10)
-    parser.add_argument('--n_step', type=int, default=50)
+    parser.add_argument('--horizon', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--save_freq', type=int, default=100)
+    parser.add_argument('--update_freq', type=int, default=100)
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--epsilon', type=float, default=0.01)
     parser.add_argument('--PER_exponent', type=float, default=0.4, help='PER exponent')
@@ -184,14 +189,12 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--supervised_loss_margin', type=float, default=0.8)
     parser.add_argument('--discount_factor', type=float, default=0.99)
-    parser.add_argument('--agent_memory_capacity', type=int, default=20000)
     parser.add_argument('--pretrain_steps', type=int, default=10000)
     parser.add_argument('--n_hid', type=int, default=64)
-    parser.add_argument('--inv_feature_dim', type=int, default=128)
-    parser.add_argument('--inv_network_dim', type=int, default=128)
+    parser.add_argument('--vec_feature_dim', type=int, default=128)
+    parser.add_argument('--vec_network_dim', type=int, default=128)
     parser.add_argument('--pov_feature_dim', type=int, default=128)
     parser.add_argument('--q_net_dim', type=int, default=128)
-    parser.add_argument('--update_freq', type=int, default=100)
     
     args = parser.parse_args()
     

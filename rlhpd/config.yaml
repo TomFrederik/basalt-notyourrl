@@ -14,16 +14,20 @@ demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
 out:
     base_dir: ./output
 
-# Pretrain_DQfD.py arguments
-pretrain_dqfd_args:
+##########
+# DQfD
+##########
+
+# DQfD args that are common to both pretraining and training
+dqfd_args:
     env_name: MineRLBasaltFindCave-v0
-    log_dir: ./output
-    model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
     data_dir: /home/lieberummaas/datadisk/minerl/data #TODO -> change this accordingly
+    log_dir: ./output
     num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
-    n_step: 50
+    horizon: 50
     batch_size: 100
     save_freq: 100
+    update_freq: 100
     lr: 0.0003
     epsilon: 0.01
     PER_exponent: 0.4
@@ -33,14 +37,29 @@ pretrain_dqfd_args:
     weight_decay: 0.00001
     supervised_loss_margin: 0.8
     discount_factor: 0.99
-    agent_memory_capacity: 100000 
     pretrain_steps: 100000
+
+# args that are special to pretraining
+pretrain_dqfd_args:
+    model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
     n_hid: 64
-    inv_feature_dim: 128
-    inv_network_dim: 128
+    vec_feature_dim: 128
+    vec_network_dim: 128
     pov_feature_dim: 128
     q_net_dim: 128
-    update_freq: 100
+
+# args that are special to training
+train_dqfd_args:
+    agent_memory_capacity: 100000 
+    train_steps: 100000
+    action_repeat: 1
+    model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
+    new_model_path: ./output/MineRLBasaltFindCave-v0/Q_1.pth
+    reward_model_path: ./output/MineRLBasaltFindCave-v0/reward_model_0.pth
+
+###########
+# Sampling
+###########
 
 sampler:
     db_path: ./output/annotation_buffer.db
@@ -53,6 +72,10 @@ sampler:
     pair_per_sample: 2
     autolabel: True
     autolabel_per_sample: 1
+
+###########
+# Rating
+###########
 
 rate_ui:
     videos_dir: ./output/videos
