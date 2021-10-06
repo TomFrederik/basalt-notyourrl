@@ -12,7 +12,7 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from torch.utils.tensorboard import SummaryWriter
+import wandb
 
 from common.DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs, RewardWrapper, StateWrapper
 from common.DQfD_models import QNetwork
@@ -135,10 +135,14 @@ def train(
             optimizer.step()
             
             # loss logging
-            writer.add_scalar('Training/total_loss', loss, global_step=steps)
-            writer.add_scalar('Training/J_DQ', J_DQ.mean(), global_step=steps)
-            writer.add_scalar('Training/J_E', J_E.sum() / expert_mask.sum(), global_step=steps)
-            writer.add_scalar('Training/J_n', J_n.mean(), global_step=steps)
+            log_dict = {
+                'Training/total_loss': loss,
+                'Training/J_DQ': J_DQ.mean()
+                'Training/J_E': J_E.sum() / expert_mask.sum(),
+                'Training/J_n', J_n.mean(),
+                'Training/Step': steps
+            }
+            wandb.log(log_dict)
             
             # sample weight updating with td_error
             # (reward is always 0 in pretraining)
@@ -157,6 +161,8 @@ def train(
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq):
+    
+    wandb.init('DQfD_training')
     
     # set save dir
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)

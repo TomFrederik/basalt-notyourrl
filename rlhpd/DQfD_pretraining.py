@@ -10,7 +10,7 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from torch.utils.tensorboard import SummaryWriterimport wandb
+import wandb
 
 from common.DQfD_utils import MemoryDataset
 from common.DQfD_models import QNetwork
@@ -79,7 +79,7 @@ def pretrain(
             'Pretraining/ExpertQValues': expert_q_values,
             'Pretraining/OtherQValues': other_q_values,
             'Pretraining/expert_actions': wandb.Histogram(cur_expert_action),
-            'Step': steps
+            'Pretraining/Step': steps
         }
         wandb.log(log_dict)
         
@@ -99,7 +99,7 @@ def pretrain(
     return q_net
 
 def main(env_name, pretrain_steps, save_freq, model_path,
-         lr, horizon, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
+         lr, horizon, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
          pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, update_freq):
     
