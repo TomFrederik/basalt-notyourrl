@@ -14,7 +14,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import wandb
 
-from common.DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs, RewardWrapper, StateWrapper
+from common.DQfD_utils import MemoryDataset, loss_function, preprocess_state, RewardWrapper, StateWrapper
 from common.DQfD_models import QNetwork
 
 class DummyRewardModel(nn.Module):
@@ -92,7 +92,7 @@ def train(
                 action,
                 next_obs,
                 reward,
-                None, #n_step_state TODO
+                {'pov':0, 'vec':0}, #n_step_state TODO
                 0, #n_step_reward TODO
                 td_error
             )
@@ -103,21 +103,24 @@ def train(
             
             # sample a new batch from the dataset
             batch_idcs = dataset.combined_memory.sample(batch_size)
-            state, next_state, n_step_state, action, reward, n_step_reward, idcs, weight, expert_mask = zip(*[dataset[idx] for idx in batch_idcs])
+            state, next_state, n_step_state, action, reward, n_step_reward, idcs, weights, expert_mask = zip(*[dataset[idx] for idx in batch_idcs])
             pov, vec = zip(*state)
             next_pov, next_vec = zip(*next_state)
+            #n_step_pov, n_step_vec = zip(*n_step_state)
             pov = torch.from_numpy(np.array(pov))
             vec = torch.from_numpy(np.array(vec))
             next_pov = torch.from_numpy(np.array(next_pov))
             next_vec = torch.from_numpy(np.array(next_vec))
-            weight = torch.from_numpy(np.array(weight))
+            #n_step_pov = torch.from_numpy(np.array(n_step_pov))
+            #n_step_vec = torch.from_numpy(np.array(n_step_vec))
+            weights = torch.from_numpy(np.array(weights))
             expert_mask = torch.from_numpy(np.array(expert_mask))
 
             # compute q values
             q_values = q_net.forward(pov, vec)
             next_q_values = q_net.forward(next_pov, next_vec)
             next_target_q_values = target_q_net.forward(next_pov, next_vec)
-            n_step_q_values = q_net.forward(n_step_pov, n_step_vec)
+            #n_step_q_values = q_net.forward(n_step_pov, n_step_vec)
             
             # compute actions
             q_actions = torch.argmax(q_values, 1)
@@ -125,7 +128,7 @@ def train(
             next_target_q_action = torch.argmax(next_target_q_values, 1)
             
             # compute td error
-            updated_td_error = torch.abs(rew + discount_factor * next_q_values[next_q_action] - q_values[action])
+            updated_td_error = torch.abs(reward + discount_factor * next_q_values[next_q_action] - q_values[action])
 
             # zero gradients
             optimizer.zero_grad(set_to_none=True)

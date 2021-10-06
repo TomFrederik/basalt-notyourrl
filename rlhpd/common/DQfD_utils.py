@@ -49,6 +49,7 @@ class ReplayBuffer(object):
         
         for t in range(len(obs)-self.n_step):
             state = obs[t]
+            state = {'pov': preprocess_pov_obs(state), 'vec':preprocess_non_pov_obs(state)}
             action = actions[t]
             reward = rewards[t]
             td_error = td_errors[t]
@@ -161,20 +162,20 @@ class MemoryDataset(Dataset):
 
         processed_action = self._preprocess_action(action)
 
-        pov = einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
-        next_pov = einops.rearrange(next_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
-        n_step_pov = einops.rearrange(n_step_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
+        pov = state['pov']
+        next_pov = next_state['pov']
+        n_step_pov = n_step_state['pov']
 
-        inv = self._preprocess_other_obs(state)
-        next_inv = self._preprocess_other_obs(next_state)
-        n_step_inv = self._preprocess_other_obs(n_step_state)
+        vec = state['vec']
+        next_vec = next_state['vec']
+        n_step_vec = n_step_state['vec']
 
         reward = reward.astype(np.float32)
         n_step_reward = n_step_reward.astype(np.float32)
         
         weight = self.weights[idx]
 
-        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), processed_action, reward, n_step_reward, idx, weight, expert
+        return (pov, vec), (next_pov, next_vec), (n_step_pov, n_step_vec), processed_action, reward, n_step_reward, idx, weight, expert
 
     def _preprocess_action(self, action):
         '''
@@ -263,7 +264,11 @@ def preprocess_non_pov_obs(state):
     
     return np.array(inv_obs).astype(np.float32)
 
+def preprocess_pov_obs(state):
+    return einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
 
+def preprocess_state(state):
+    return {'pov':preprocess_pov_obs(state), 'vec':preprocess_non_pov_obs(state)}
 
 def loss_function(
     reward, 
@@ -294,7 +299,7 @@ class StateWrapper(gym.ObservationWrapper):
         self.env = env
         
     def observation(self, obs):
-        return {'pov':einops.rearrange(obs['pov'], 'h w c -> c h w'), 'vec':preprocess_non_pov_obs(obs)}
+        return preprocess_state(obs)
 
 class RewardWrapper(gym.Wrapper):
     def __init__(self, env, reward_model):
