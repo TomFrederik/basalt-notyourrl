@@ -14,8 +14,33 @@ demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
 out:
     base_dir: ./output
 
-pretrain_policy:
-    model_path: ./output/Q_0.pth
+# Pretrain_DQfD.py arguments
+pretrain_dqfd_args:
+    env_name: MineRLBasaltFindCave-v0
+    log_dir: ./output
+    model_path: ./output/Q_0/.pth
+    data_dir: ./data
+    num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
+    n_step: 50
+    batch_size: 100
+    save_freq: 100
+    lr: 0.0003
+    epsilon: 0.01
+    PER_exponent: 0.4
+    IS_exponent_0: 0.6
+    agent_p_offset:  0.001
+    expert_p_offset: 1
+    weight_decay: 0.00001
+    supervised_loss_margin: 0.8
+    discount_factor: 0.99
+    agent_memory_capacity: 100000 
+    pretrain_steps: 100000
+    n_hid: 64
+    inv_feature_dim: 128
+    inv_network_dim: 128
+    pov_feature_dim: 128
+    q_net_dim: 128
+    update_freq: 100
 
 sampler:
     db_path: ./output/annotation_buffer.db
