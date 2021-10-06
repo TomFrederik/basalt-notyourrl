@@ -41,7 +41,7 @@ class DataBaseFiller:
         self.autolabel = cfg.sampler.autolabel
         self.autolabel_num = cfg.sampler.autolabel_per_sample
 
-        # self.policy_model = load_policy(cfg.pretrain_policy.model_path)
+        # self.policy_model = load_policy(cfg.pretrain_dqfd_args.model_path)
         
         self.num_traj = cfg.sampler.num_traj
         self.max_traj_length = cfg.sampler.max_traj_length

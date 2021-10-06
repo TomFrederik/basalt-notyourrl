@@ -15,7 +15,20 @@ from torch.utils.tensorboard import SummaryWriter
 from DQfD_utils import MemoryDataset
 from DQfD_models import QNetwork
 
-def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
+def pretrain(
+    log_dir, 
+    model_path, 
+    save_freq, 
+    dataset, 
+    discount_factor, 
+    q_net, 
+    pretrain_steps, 
+    batch_size, 
+    supervised_loss_margin, 
+    lr, 
+    weight_decay, 
+    update_freq
+):
     
     # init tensorboard writer
     writer = SummaryWriter(log_dir)
@@ -76,7 +89,7 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
         
         if steps % save_freq == 0:
             print('Saving model...')
-            torch.save(q_net, os.path.join(log_dir, 'model.pt'))
+            torch.save(q_net, model_path)
         
         if steps % update_freq == 0:
             print('Updating target model...')
@@ -84,7 +97,7 @@ def pretrain(log_dir, save_freq, dataset, discount_factor, q_net, pretrain_steps
             
     return q_net
 
-def main(env_name, pretrain_steps, save_freq,
+def main(env_name, pretrain_steps, save_freq, model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
          pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
@@ -92,6 +105,8 @@ def main(env_name, pretrain_steps, save_freq,
     # set save dir
     # TODO: save config in file path?
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
+    if model_path is None:
+        model_path = os.path.join(log_dir, 'Q_0.pth')
     os.makedirs(log_dir, exist_ok=True)
     
     # set device
@@ -134,6 +149,7 @@ def main(env_name, pretrain_steps, save_freq,
     # launch pretraining
     q_net = pretrain(
         log_dir,
+        model_path,
         save_freq,
         dataset,
         discount_factor, 
@@ -147,12 +163,13 @@ def main(env_name, pretrain_steps, save_freq,
     )
     
     print('Training finished! Saving model...')
-    torch.save(q_net, os.path.join(log_dir, 'model.pt'))
+    torch.save(q_net, model_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', default='MineRLBasaltFindCave-v0')
     parser.add_argument('--log_dir', default='/home/lieberummaas/datadisk/basalt-notyourrl/run_logs')
+    parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--num_expert_episodes', type=int, default=10)
     parser.add_argument('--n_step', type=int, default=50)
