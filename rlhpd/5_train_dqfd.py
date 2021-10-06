@@ -1,6 +1,8 @@
 """
 Step 8 in the algorithm:
 Train DQfD with expert demos and initial reward model
+
+IMPORTANT: Make sure to execute this script with 'xvfb-run -a python ...' to enable the minerl gym environment
 """
 
 import argparse

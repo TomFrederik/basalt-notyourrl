@@ -1,0 +1,143 @@
+diff --git a/rlhpd/5_train_dqfd.py b/rlhpd/5_train_dqfd.py
+index 3a44e44..8bdbf7a 100644
+--- a/rlhpd/5_train_dqfd.py
++++ b/rlhpd/5_train_dqfd.py
+@@ -1,6 +1,8 @@
+ """
+ Step 8 in the algorithm:
+ Train DQfD with expert demos and initial reward model
++
++IMPORTANT: Make sure to execute this script with 'xvfb-run -a python ...' to enable the minerl gym environment
+ """
+ 
+ import argparse
+diff --git a/rlhpd/DQfD_pretraining.py b/rlhpd/DQfD_pretraining.py
+index 6408aed..38776a3 100644
+--- a/rlhpd/DQfD_pretraining.py
++++ b/rlhpd/DQfD_pretraining.py
+@@ -52,9 +52,9 @@ def pretrain(
+         weight = torch.from_numpy(np.array(weight))
+ 
+         # forward pass
+-        cur_q_values = q_net.forward(dict(pov=pov, vec=vec))
++        cur_q_values = q_net.forward(pov, vec)
+         with torch.no_grad():
+-            next_q_values = target_q_net.forward(dict(pov=next_pov, vec=next_vec))
++            next_q_values = target_q_net.forward(next_pov, next_vec)
+         
+         # zero gradients
+         optimizer.zero_grad(set_to_none=True)
+diff --git a/rlhpd/DQfD_training.py b/rlhpd/DQfD_training.py
+index b63f8f4..5d1468b 100644
+--- a/rlhpd/DQfD_training.py
++++ b/rlhpd/DQfD_training.py
+@@ -43,9 +43,6 @@ def train(
+     epsilon
+ ):
+     
+-    # init tensorboard writer
+-    writer = SummaryWriter(log_dir)
+-    
+     # init optimizer
+     optimizer = torch.optim.AdamW(q_net.parameters(), lr=lr, weight_decay=weight_decay)
+     
+@@ -66,7 +63,8 @@ def train(
+         while not done:
+             # compute q values
+             with torch.no_grad():
+-                q_values = q_net.forward(**obs)
++                q_input = {'pov': torch.as_tensor(obs['pov'])[None], 'vec': torch.as_tensor(obs['vec'])[None]}
++                q_values = q_net.forward(**q_input)
+                 q_action = torch.argmax(q_values).item()
+                 
+             # sample action from epsilon-greedy behavior policy
+@@ -81,7 +79,8 @@ def train(
+             next_obs, reward, done, info = env.step(action)
+ 
+             # compute next q values
+-            next_q_values = q_net.forward(**next_obs)
++            q_input = {'pov': torch.as_tensor(next_obs['pov'])[None], 'vec': torch.as_tensor(next_obs['vec'])[None]}
++            next_q_values = q_net.forward(**q_input)
+             next_q_action = torch.argmax(next_q_values).item()
+ 
+             # compute td error
+@@ -125,7 +124,7 @@ def train(
+ 
+             ## compute loss
+             # J_DQ
+-            J_DQ = (reward + discount_factor * next_q_values[np.arange(len(next_q_values), next_target_q_action] - q_values[np.arange(len(q_values)), action]) ** 2
++            J_DQ = (reward + discount_factor * next_q_values[np.arange(len(next_q_values)), next_target_q_action] - q_values[np.arange(len(q_values)), action]) ** 2
+             
+             # J_E
+             pre_max_q = q_values + supervised_loss_margin
+@@ -145,9 +144,9 @@ def train(
+             # loss logging
+             log_dict = {
+                 'Training/total_loss': loss,
+-                'Training/J_DQ': J_DQ.mean()
++                'Training/J_DQ': J_DQ.mean(),
+                 'Training/J_E': J_E.sum() / expert_mask.sum(),
+-                'Training/J_n', J_n.mean(),
++                'Training/J_n': J_n.mean(),
+                 'Training/Step': steps
+             }
+             wandb.log(log_dict)
+@@ -241,7 +240,6 @@ if __name__ == '__main__':
+     parser.add_argument('--batch_size', type=int, default=100)
+     parser.add_argument('--save_freq', type=int, default=100)
+     parser.add_argument('--update_freq', type=int, default=100)
+-    parser.add_argument('--action_repeat', type=int, default=1)
+     parser.add_argument('--lr', type=float, default=3e-4)
+     parser.add_argument('--epsilon', type=float, default=0.01)
+     parser.add_argument('--PER_exponent', type=float, default=0.4, help='PER exponent')
+diff --git a/rlhpd/common/DQfD_models.py b/rlhpd/common/DQfD_models.py
+index a599fa8..0f19091 100644
+--- a/rlhpd/common/DQfD_models.py
++++ b/rlhpd/common/DQfD_models.py
+@@ -44,12 +44,12 @@ class QNetwork(nn.Module):
+             nn.Linear(q_net_dim, num_actions),
+         )
+     
+-    def forward(self, obs):
++    def forward(self, pov, vec):
+         # apply conv net to pov_obs
+-        pov_features = self.conv(obs['pov'])
++        pov_features = self.conv(pov)
+         
+         # preprocess other observations
+-        vec_features = self.vec_network(obs['vec'])
++        vec_features = self.vec_network(vec)
+         
+         # concat inputs
+         q_net_input = torch.cat([pov_features, vec_features], dim=1)
+diff --git a/rlhpd/common/DQfD_utils.py b/rlhpd/common/DQfD_utils.py
+index f704d09..90527e3 100644
+--- a/rlhpd/common/DQfD_utils.py
++++ b/rlhpd/common/DQfD_utils.py
+@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
+ import minerl
+ import gym
+ 
+-from action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
++from common.action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
+ 
+ Transition = namedtuple('Transition',
+                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
+@@ -290,7 +290,7 @@ def loss_function(
+ 
+ class StateWrapper(gym.ObservationWrapper):
+     def __init__(self, env):
+-        super().__init__()
++        super().__init__(env)
+         self.env = env
+         
+     def observation(self, obs):
+@@ -298,7 +298,7 @@ class StateWrapper(gym.ObservationWrapper):
+ 
+ class RewardWrapper(gym.Wrapper):
+     def __init__(self, env, reward_model):
+-        super().__init__()
++        super().__init__(env)
+         self.env = env
+         self.reward_model = reward_model
+     

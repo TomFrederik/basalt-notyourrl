@@ -63,8 +63,7 @@ def train(
         while not done:
             # compute q values
             with torch.no_grad():
-                q_input = {'pov': torch.from_numpy(obs['pov'].copy())[None], 'vec': torch.from_numpy(obs['vec'].copy())[None]}
-                q_values = q_net.forward(**q_input)
+                q_values = q_net.forward(**obs)
                 q_action = torch.argmax(q_values).item()
                 
             # sample action from epsilon-greedy behavior policy
@@ -79,8 +78,7 @@ def train(
             next_obs, reward, done, info = env.step(action)
 
             # compute next q values
-            q_input = {'pov': torch.from_numpy(next_obs['pov'].copy())[None], 'vec': torch.from_numpy(next_obs['vec'].copy())[None]}
-            next_q_values = q_net.forward(**q_input)
+            next_q_values = q_net.forward(**next_obs)
             next_q_action = torch.argmax(next_q_values).item()
 
             # compute td error
@@ -103,15 +101,7 @@ def train(
             
             # sample a new batch from the dataset
             batch_idcs = dataset.combined_memory.sample(batch_size)
-            state, next_state, n_step_state, action, reward, n_step_reward, idcs, weight, expert_mask = zip(*[dataset[idx] for idx in batch_idcs])
-            pov, vec = zip(*state)
-            next_pov, next_vec = zip(*next_state)
-            pov = torch.from_numpy(np.array(pov))
-            vec = torch.from_numpy(np.array(vec))
-            next_pov = torch.from_numpy(np.array(next_pov))
-            next_vec = torch.from_numpy(np.array(next_vec))
-            weight = torch.from_numpy(np.array(weight))
-            expert_mask = torch.from_numpy(np.array(expert_mask))
+            (pov, vec), (next_pov, next_vec), (n_step_pov, n_step_vec), action, reward, n_step_reward, idcs, weight, expert_mask = zip([dataset[idx] for idx in batch_idcs])
 
             # compute q values
             q_values = q_net.forward(pov, vec)

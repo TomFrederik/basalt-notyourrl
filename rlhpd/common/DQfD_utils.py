@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 import minerl
 import gym
 
-from action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
+from common.action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
@@ -102,9 +102,9 @@ class CombinedMemory(object):
         
     def __getitem__(self, idx):
         if idx < len(self.memory_dict['expert'].memory):
-            return self.memory_dict['expert'].memory[idx]
+            return self.memory_dict['expert'].memory[idx], 1
         else:
-            return self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)]
+            return self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)], 0
 
     def sample(self, batch_size):
         idcs = np.random.choice(np.arange(len(self)), size=batch_size, replace=False, p=self.weights/np.sum(self.weights))
@@ -157,7 +157,7 @@ class MemoryDataset(Dataset):
         return len(self.combined_memory)
     
     def __getitem__(self, idx):
-        state, action, next_state, reward, n_step_state, n_step_reward, td_error = self.combined_memory[idx]
+        state, action, next_state, reward, n_step_state, n_step_reward, td_error, expert = self.combined_memory[idx]
 
         processed_action = self._preprocess_action(action)
 
@@ -174,7 +174,7 @@ class MemoryDataset(Dataset):
         
         weight = self.weights[idx]
 
-        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), processed_action, reward, n_step_reward, idx, weight
+        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), processed_action, reward, n_step_reward, idx, weight, expert
 
     def _preprocess_action(self, action):
         '''
@@ -290,15 +290,15 @@ def loss_function(
 
 class StateWrapper(gym.ObservationWrapper):
     def __init__(self, env):
-        super().__init__()
+        super().__init__(env)
         self.env = env
         
     def observation(self, obs):
-        return {'pov':obs['pov'], 'vec':preprocess_non_pov_obs(obs)}
+        return {'pov':einops.rearrange(obs['pov'], 'h w c -> c h w'), 'vec':preprocess_non_pov_obs(obs)}
 
 class RewardWrapper(gym.Wrapper):
     def __init__(self, env, reward_model):
-        super().__init__()
+        super().__init__(env)
         self.env = env
         self.reward_model = reward_model
     

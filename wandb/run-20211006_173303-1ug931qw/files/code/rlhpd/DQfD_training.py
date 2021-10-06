@@ -63,7 +63,7 @@ def train(
         while not done:
             # compute q values
             with torch.no_grad():
-                q_input = {'pov': torch.from_numpy(obs['pov'].copy())[None], 'vec': torch.from_numpy(obs['vec'].copy())[None]}
+                q_input = {'pov': torch.from_numpy(obs['pov'])[None], 'vec': torch.from_numpy(obs['vec'])[None]}
                 q_values = q_net.forward(**q_input)
                 q_action = torch.argmax(q_values).item()
                 
@@ -79,7 +79,7 @@ def train(
             next_obs, reward, done, info = env.step(action)
 
             # compute next q values
-            q_input = {'pov': torch.from_numpy(next_obs['pov'].copy())[None], 'vec': torch.from_numpy(next_obs['vec'].copy())[None]}
+            q_input = {'pov': torch.from_numpy(next_obs['pov'])[None], 'vec': torch.from_numpy(next_obs['vec'])[None]}
             next_q_values = q_net.forward(**q_input)
             next_q_action = torch.argmax(next_q_values).item()
 

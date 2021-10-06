@@ -44,12 +44,12 @@ class QNetwork(nn.Module):
             nn.Linear(q_net_dim, num_actions),
         )
     
-    def forward(self, obs):
+    def forward(self, pov, vec):
         # apply conv net to pov_obs
-        pov_features = self.conv(obs['pov'])
+        pov_features = self.conv(pov)
         
         # preprocess other observations
-        vec_features = self.vec_network(obs['vec'])
+        vec_features = self.vec_network(vec)
         
         # concat inputs
         q_net_input = torch.cat([pov_features, vec_features], dim=1)

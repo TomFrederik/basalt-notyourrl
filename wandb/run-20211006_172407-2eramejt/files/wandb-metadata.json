@@ -1,0 +1,31 @@
+{
+    "os": "Linux-5.8.0-1041-azure-x86_64-with-glibc2.31",
+    "python": "3.9.6",
+    "heartbeatAt": "2021-10-06T17:24:08.470710",
+    "startedAt": "2021-10-06T17:24:07.553182",
+    "docker": null,
+    "gpu": "Tesla K80",
+    "gpu_count": 1,
+    "cpu_count": 6,
+    "cuda": null,
+    "args": [
+        "--model_path",
+        "/home/lieberummaas/datadisk/basalt-notyourrl/run_logs/MineRLBasaltFindCave-v0/1633540658/Q_0.pth",
+        "--new_model_path",
+        "/home/lieberummaas/datadisk/basalt-notyourrl/run_logs/MineRLBasaltFindCave-v0/DQfD_training/Q_1.pth",
+        "--num_expert_episodes",
+        "1"
+    ],
+    "state": "running",
+    "program": "/home/lieberummaas/datadisk/basalt-notyourrl/rlhpd/DQfD_training.py",
+    "codePath": "rlhpd/DQfD_training.py",
+    "git": {
+        "remote": "http://gitlab.aicrowd.com/chrischongtt/basalt-notyourrl.git",
+        "commit": "503db45d42df025293de2833dcc0c3d0b680d9aa"
+    },
+    "email": null,
+    "root": "/home/lieberummaas/datadisk/basalt-notyourrl",
+    "host": "minerlVM",
+    "username": "lieberummaas",
+    "executable": "/home/lieberummaas/datadisk/anaconda3/envs/minerl/bin/python"
+}
