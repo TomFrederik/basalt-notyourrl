@@ -103,7 +103,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
          pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
     
     # set save dir
-    # TODO: save config in file path?
+    # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
     if model_path is None:
         model_path = os.path.join(log_dir, 'Q_0.pth')

@@ -271,4 +271,14 @@ def loss_function(
     return loss
 
 
+class EnvironmentWrapper(gym.Wrapper):
+    def __init__(self, env, reward_model):
+        super().__init__()
+        self.env = env
+        self.reward_model = reward_model
+    
+    def step(self, action):
+        next_state, reward, done, info = env.step(action)
+        reward = self.reward_model(next_state) # TODO: needs to be adapted to properly fit reward model I/O behaviour
+        return next_state, reward, done, info
 

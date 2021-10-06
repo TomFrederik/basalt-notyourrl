@@ -14,13 +14,26 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
-from DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs
+from DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs, EnvironmentWrapper
 from DQfD_models import QNetwork
 
-# epsilon for epsilon-greedy policy
-EPSILON = 0.05 # TODO: put this in argparse
-
-def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_steps, batch_size, supervised_loss_margin, lr, weight_decay, update_freq):
+def train(
+    log_dir, 
+    new_model_path,
+    env_name, 
+    reward_model,
+    save_freq, 
+    dataset, 
+    discount_factor, 
+    q_net, 
+    train_steps, 
+    batch_size, 
+    supervised_loss_margin, 
+    lr, 
+    weight_decay, 
+    update_freq, 
+    epsilon
+):
     
     # init tensorboard writer
     writer = SummaryWriter(log_dir)
@@ -33,6 +46,7 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
     
     # init env
     env = gym.make(env_name)
+    env = EnvironmentWrapper(env, reward_model) #TODO implement this
     obs = env.reset()
     done = False
     
@@ -42,7 +56,7 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
         
         while not done:
             # sample action from epsilon-greedy behavior policy
-            if random() < EPSILON:
+            if random() < epsilon:
                 # choose a random action
                 action = randint(0, q_net.num_actions)
             else:
@@ -70,7 +84,7 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
         optimizer.zero_grad(set_to_none=True)
 
         # compute loss
-        loss_function(
+        loss = loss_function(
             reward, 
             action, 
             cur_expert_action, 
@@ -83,9 +97,8 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
             n_step
         )
         
-        
         # backward and step
-        J_E.backward()
+        loss.backward()
         optimizer.step()
         
         # loss logging
@@ -98,7 +111,7 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
         
         if steps % save_freq == 0:
             print('Saving model...')
-            torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+            torch.save(q_net, new_model_path)
         
         if steps % update_freq == 0:
             print('Updating target model...')
@@ -106,18 +119,23 @@ def train(log_dir, env_name, save_freq, dataset, discount_factor, q_net, train_s
             
     return q_net
 
-def main(env_name, train_steps, save_freq,
+def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
-         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
-         pov_feature_dim, inv_network_dim, inv_feature_dim, q_net_dim, update_freq):
+         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq):
     
     # set save dir
-    # TODO: save config in file path?
+    # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
     os.makedirs(log_dir, exist_ok=True)
     
-    # set device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # set device # TODO: use cuda?
+    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+    # load q_net
+    q_net = torch.load(model_path)
+
+    # load reward model
+    reward_model = torch.load(reward_model_path)
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -133,32 +151,12 @@ def main(env_name, train_steps, save_freq,
         num_expert_episodes
     )
 
-    # init q net
-    inv_sample = dataset[0][0][0]
-    print(f'{inv_sample = }')
-    inv_dim = inv_sample.shape[0]
-    print(f'{inv_dim = }')
-    
-    action_sample = dataset[0][3]
-    print(f'{action_sample}')
-    num_actions = len(action_sample)
-    print(f'{num_actions}')
-    
-    q_net_kwargs = {
-        'num_actions':num_actions,
-        'inv_dim':inv_dim,
-        'n_hid':n_hid,
-        'pov_feature_dim':pov_feature_dim,
-        'inv_feature_dim':inv_feature_dim,
-        'inv_network_dim':inv_network_dim,
-        'q_net_dim':q_net_dim
-    }
-    q_net = QNetwork(**q_net_kwargs).load_state_dict(torch.load(q_net_path))
-    
     # launch training
     q_net = train(
         log_dir,
+        new_model_path,
         env_name,
+        reward_model,
         save_freq,
         dataset,
         discount_factor, 
@@ -168,18 +166,22 @@ def main(env_name, train_steps, save_freq,
         supervised_loss_margin,
         lr,
         weight_decay,
-        update_freq
+        update_freq,
+        epsilon
     )
     
     print('Training finished! Saving model...')
-    torch.save(q_net.state_dict(), os.path.join(log_dir, 'model.pt'))
+    torch.save(q_net, new_model_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', default='MineRLTreechop-v0')
     parser.add_argument('--log_dir', default='/home/lieberummaas/datadisk/minerl/run_logs')
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
-    parser.add_argument('--num_expert_episodes', type=int, default=10)
+    parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--new_model_path', type=str, required=True)
+    parser.add_argument('--reward_model_path', type=str, required=True)
+    parser.add_argument('--num_expert_episodes', type=int, default=100)
     parser.add_argument('--n_step', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--save_freq', type=int, default=100)
@@ -194,12 +196,7 @@ if __name__ == '__main__':
     parser.add_argument('--supervised_loss_margin', type=float, default=0.8)
     parser.add_argument('--discount_factor', type=float, default=0.99)
     parser.add_argument('--agent_memory_capacity', type=int, default=20000)
-    parser.add_argument('--train_steps', type=int, default=100)
-    parser.add_argument('--n_hid', type=int, default=64)
-    parser.add_argument('--inv_feature_dim', type=int, default=128)
-    parser.add_argument('--inv_network_dim', type=int, default=128)
-    parser.add_argument('--pov_feature_dim', type=int, default=128)
-    parser.add_argument('--q_net_dim', type=int, default=128)
+    parser.add_argument('--train_steps', type=int, default=100000)
     parser.add_argument('--update_freq', type=int, default=100)
     
     args = parser.parse_args()
