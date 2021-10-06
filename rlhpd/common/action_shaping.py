@@ -502,8 +502,8 @@ class ActionWrapper(gym.Wrapper):
         
     def step(self, action):
         # reverse map action one-hot to env action
-        new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action,
-            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action,
+        new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action_simple,
+            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action_simple,
             'MineRLBasaltCreateVillageAnimalPen-v0':reverse_create_pen_action,
             'MineRLBasaltBuildVillageHouse-v0':reverse_build_house_action
         }[self.env_name](action)
