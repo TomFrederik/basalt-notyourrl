@@ -52,6 +52,13 @@ class AnnotationBuffer:
         self.c.execute(stmt,(preference, left_id, right_id))
         self.conn.commit()
 
+    def get_all_rated_pairs_with_labels(self) -> List[Tuple[str]]:
+        self.c.execute('''SELECT * FROM trajectories WHERE preference = 1 OR preference = 2 OR preference = 3''') 
+        rows = self.c.fetchall()
+        rated_pairs = [(line[0],line[1]) for line in rows]
+        labels = [(line[2]) for line in rows]
+        return rated_pairs, labels
+
     def get_all_unrated_pairs(self) -> List[Tuple[str]]:
         self.c.execute('''SELECT * FROM trajectories WHERE preference = 0''') 
         unrated_pairs = self.c.fetchall()

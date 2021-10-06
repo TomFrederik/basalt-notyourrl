@@ -9,27 +9,44 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from . import preference_helpers as pref
-
+from .database import AnnotationBuffer
 
 class TrajectoryPreferencesDataset(Dataset):
     """Trajectory preferences dataset."""
 
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, annotation_db_path=None, transform=None):
         """
         Args:
             data_dir (string): Path to the directory containing pickled trajectory
                 (state, action, reward) tuples
+            annotation_db_path (string): Path to the annotation db
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        traj_paths = sorted([x for x in Path(data_dir).glob("*.pickle")])
-        # Populate all possible pairs
-        path_pairs = []
-        for path_a in traj_paths:
-            for path_b in traj_paths:
-                if path_a == path_b:
-                    continue
-                path_pairs.append((path_a, path_b))
+        self.annotation_db_path = annotation_db_path
+        self.data_dir = Path(data_dir)
+        assert self.data_dir.is_dir()
+        self.labels = None
+
+        if annotation_db_path is not None:
+            db = AnnotationBuffer(annotation_db_path)
+            id_pairs, labels = db.get_all_rated_pairs_with_labels()
+            path_pairs = [
+                ((self.data_dir / l).with_suffix('.pickle'), (self.data_dir / r).with_suffix('.pickle')) 
+                for l, r in id_pairs]
+            self.labels = labels
+        else:
+            # If annotation_db not given, assume that we have reward-labelled clips
+            # so we can just load any pair of clips and simulate the judgement ourselves
+            traj_paths = sorted([x for x in Path(data_dir).glob("*.pickle")])
+            # Populate all possible pairs
+            path_pairs = []
+            for path_a in traj_paths:
+                for path_b in traj_paths:
+                    if path_a == path_b:
+                        continue
+                    path_pairs.append((path_a, path_b))
+
         self.traj_path_pairs = path_pairs
         self.transform = transform
 
@@ -48,8 +65,11 @@ class TrajectoryPreferencesDataset(Dataset):
             clip_b = pickle.load(f)
         assert len(clip_a) == len(clip_b)
 
-        # Compute judgement based on rewards
-        judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
+        if self.labels is None:
+            # Compute judgement based on rewards
+            judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
+        else:
+            judgement = torch.as_tensor(self.labels)
 
         # Preprocess images
         frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)

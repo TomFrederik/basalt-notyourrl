@@ -10,9 +10,9 @@ from common import database, utils
 
 
 def save_vid(pickle_path, video_path, fps):
-    print(pickle_path)
     with open(pickle_path, 'rb') as f:
         clip = pickle.load(f)
+    assert len(clip) > 0
     imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
 
     video_path.parent.mkdir(parents=True, exist_ok=True)    
@@ -51,12 +51,12 @@ class App:
         equally_good = st.container()
         ask_for_new = st.container()
 
-        with instructions:
+        with st.sidebar:
             st.write("Instructions:")
             st.write("Pick the video you prefer for now :)")
 
-        with number_left:
-            st.write(self.db.return_all_data())
+            # with number_left:
+            # st.write(self.db.return_all_data())
             st.write(f"Trajectory pairs waiting to be rated: {self.db.get_number_of_unrated_pairs()}")
 
         # check folder for videos

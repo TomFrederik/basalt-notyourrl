@@ -72,7 +72,7 @@ class DataBaseFiller:
         observation = self.env.reset()
 
         trajectory = []
-        for _ in range(self.max_traj_length):
+        for i in range(self.max_traj_length):
             # trajectory[step_idx] = observation["pov"]
             # observation, _, done, _ = self._step_random_policy()
             action = self._random_policy(observation)
@@ -82,8 +82,9 @@ class DataBaseFiller:
             observation = next_observation
 
             self.env.render()
-            if done:
-                break
+            # if done:
+            #     break
+        print("Generated trajectory of length", len(trajectory))
         return trajectory
 
     def _generate_sample(self, trajectory):
@@ -98,6 +99,7 @@ class DataBaseFiller:
 
     @staticmethod
     def _write_to_file(path, trajectory):
+        print(f"Saving trajectory {path} of size", len(trajectory))
         with open(path, 'wb') as f:
             pickle.dump(trajectory, f)
 
