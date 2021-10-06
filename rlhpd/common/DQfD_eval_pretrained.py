@@ -1,33 +1,29 @@
 import argparse
+import random
+import os
+
 import torch
 import gym
-import os
-import random
 import einops 
 import numpy as np
 import cv2
 
-from DQfD_models import QNetwork
-from DQfD_utils import preprocess_non_pov_obs
-from action_shaping import ActionWrapper
+from common.DQfD_models import QNetwork
+from common.DQfD_utils import preprocess_non_pov_obs
+from common.action_shaping import ActionWrapper
 
 def main(
     env_name,
-    log_dir,
     num_episodes,
     max_episode_len,
-    model_id,
+    model_path,
     video_dir,
     epsilon
 ):
-    # set run id
-    video_dir = os.path.join(video_dir, env_name, model_id)
-
     # check that video_dir exists
     os.makedirs(video_dir, exist_ok=True)
 
     # load model
-    model_path = os.path.join(log_dir, env_name, model_id, 'model.pt')
     q_net: QNetwork = torch.load(model_path)
     q_net.eval()
 
@@ -84,11 +80,10 @@ def main(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='MineRLBasaltFindCave-v0')
-    parser.add_argument('--log_dir', type=str, default='/home/lieberummaas/datadisk/basalt-notyourrl/run_logs/')
-    parser.add_argument('--num_episodes', type=int, default=10)
+    parser.add_argument('--num_episodes', type=int, default=1)
     parser.add_argument('--max_episode_len', type=int, default=2000)
-    parser.add_argument('--model_id', type=str, required=True)
-    parser.add_argument('--video_dir', type=str, default='/home/lieberummaas/datadisk/basalt-notyourrl/pretrain_videos')
+    parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--video_dir', type=str, default='./pretrain_videos')
     parser.add_argument('--epsilon', type=float, default=0.01, help='Epsilon for epsilon-greedy behaviour')
 
     main(**vars(parser.parse_args()))
