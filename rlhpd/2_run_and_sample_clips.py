@@ -38,16 +38,16 @@ class DataBaseFiller:
         self.env_task = cfg.env_task
         self.rng = np.random.default_rng(cfg.sampler.rnd_seed)  
         
-        self.autolabel = cfg.sampler.autolabel
-        self.autolabel_num = cfg.sampler.autolabel_per_sample
-
+        self.autolabel_with_demos = cfg.sampler.autolabel_with_demos
+        self.autolabel_demo_num = cfg.sampler.autolabel_demo_per_sample
+        self.autolabel_early_late_demos = cfg.sampler.autolabel_early_late_demos
         # self.policy_model = load_policy(cfg.pretrain_dqfd_args.model_path)
         
         self.num_traj = cfg.sampler.num_traj
         self.max_traj_length = cfg.sampler.max_traj_length
         self.num_samples = cfg.sampler.num_samples
         self.sample_length = cfg.sampler.sample_length
-        self.pair_per_sample = cfg.sampler.pair_per_sample
+        #self.pair_per_sample = cfg.sampler.pair_per_sample
         self.traj_dir = Path(cfg.sampler.traj_dir)
         self.demos_dir = cfg.demos_dir
         self.db_path = Path(cfg.sampler.db_path)
@@ -115,59 +115,73 @@ class DataBaseFiller:
                 sample_path = self.traj_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}.pickle"
                 self._write_to_file(sample_path, sample)
 
-    def _fill_database_from_files(self):
-        """ Fills the database from the saved samples """
-        #names of saved samples will be traj_x_smpl_y
-        existing_ids =self.db.return_all_ids()
-        if existing_ids:
-            for x in range(self.num_traj):
-                for y in range(self.num_samples):
-                    for _ in range(self.pair_per_sample):
-                        random_match = random.choice(existing_ids)[0]
-                        try: # if we picked a pair that exists we just skip for now TODO
-                            self.db.insert_traj_pair(
-                                f"{self.run_id}_traj_{x}_smpl_{y}", random_match)
-                        except:
-                            continue
+    # def _fill_database_from_files(self):
+    #     """ Fills the database from the saved samples """
+    #     #names of saved samples will be traj_x_smpl_y
+    #     existing_ids =self.db.return_all_ids()
+    #     if existing_ids:
+    #         for x in range(self.num_traj):
+    #             for y in range(self.num_samples):
+    #                 for _ in range(self.pair_per_sample):
+    #                     random_match = random.choice(existing_ids)[0]
+    #                     try: # if we picked a pair that exists we just skip for now TODO
+    #                         self.db.insert_traj_pair(
+    #                             f"{self.run_id}_traj_{x}_smpl_{y}", random_match)
+    #                     except:
+    #                         continue
 
-        else: # no samples in database so far, add each id once to get started 
-            for x1 in range(self.num_traj):
-                x2 = np.mod(x1+1, self.num_traj)
-                for y in range(self.num_samples):
-                    self.db.insert_traj_pair(
-                        f"{self.run_id}_traj_{x1}_smpl_{y}",
-                        f"{self.run_id}_traj_{x2}_smpl_{y}"
-                        )
+        # else: # no samples in database so far, add each id once to get started 
+        #     for x1 in range(self.num_traj):
+        #         x2 = np.mod(x1+1, self.num_traj)
+        #         for y in range(self.num_samples):
+        #             self.db.insert_traj_pair(
+        #                 f"{self.run_id}_traj_{x1}_smpl_{y}",
+        #                 f"{self.run_id}_traj_{x2}_smpl_{y}"
+        #    
+        # 
+        #              )
 
     def _get_demo_sample(self):
-        """Returns a random sample from a random demo trajectory in a numpy array"""
+        """
+        Returns a random sample from a random demo trajectory in a numpy array, and the end of trajectory
+        sample from the same trajectory
+        """
         minerl_data = minerl.data.make(self.env_task, data_dir=self.demos_dir)
         traj_names = minerl_data.get_trajectory_names()
         random_traj = np.random.choice(traj_names)
         data_frames = list(minerl_data.load_data(random_traj, include_metadata=True))
         # data_frames == list of (state, action, reward, next_state, done, meta)
 
-        start_idx = self.rng.integers(low=0, high=len(data_frames)-self.sample_length)
-        clip = data_frames[start_idx: start_idx + self.sample_length]
-        return clip
+        start_idx = self.rng.integers(low=0, high=len(data_frames)-self.sample_length-1)
+        random_clip = data_frames[start_idx: start_idx + self.sample_length]
+        end_clip = data_frames[len(data_frames)-self.sample_length: len(data_frames)]
+        return random_clip, end_clip
 
     
     def _do_autolabels(self):
         """ Pairs each newly generated sample with a random sample from the demonstrations"""
         for x in range(self.num_traj):
             for y in range(self.num_samples):
-                for _ in range(self.autolabel_num):
+                for _ in range(self.autolabel_demo_num):
                     # get a random demo sample
-                    demo_sample = self._get_demo_sample()
+                    demo_sample, end_clip = self._get_demo_sample()
                     demo_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}.pickle"
                     # save it to a file
                     self._write_to_file(demo_path,demo_sample)
+                    if self.autolabel_early_late_demos:
+                        end_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}_end.pickle"
+                        self._write_to_file(end_path,end_clip)
                     try: # if we picked a pair that exists we just skip
                         # write it to database and rate better
                         self.db.insert_traj_pair(
                             f"{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}")
                         self.db.rate_traj_pair(
                             f"{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}", 2)
+                        if self.autolabel_early_late_demos:
+                            self.db.insert_traj_pair(
+                            f"demo_{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}_end")
+                            self.db.rate_traj_pair(
+                            f"demo_{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}_end", 2)
                     except:
                         continue
 
@@ -175,9 +189,9 @@ class DataBaseFiller:
     def run(self):
         print("Generating clips from policy...")
         self._save_all_traj_and_samples()
-        print("Adding clips to database...")
-        self._fill_database_from_files()
-        if self.autolabel:
+        #print("Adding clips to database...")
+        #self._fill_database_from_files()
+        if self.autolabel_with_demos:
             print("Adding autolabelled clips from demonstrations...")
             self._do_autolabels()
 
