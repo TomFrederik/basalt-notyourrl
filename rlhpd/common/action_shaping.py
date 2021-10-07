@@ -496,6 +496,7 @@ from gym import spaces
 class ActionWrapper(gym.Wrapper):
     def __init__(self, env, env_name):
         super().__init__(env)
+        raise NotImplementedError("DEPRECATED! Use RewardActionWrapper instead!")
         self.env = env
         self.env_name = env_name
         self.action_space = spaces.Discrete(11)
