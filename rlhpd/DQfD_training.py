@@ -14,8 +14,17 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import wandb
 
-from common.DQfD_utils import MemoryDataset, loss_function, preprocess_non_pov_obs, RewardWrapper, StateWrapper
+from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper
+from common.state_shaping import StateWrapper, preprocess_state
 from common.DQfD_models import QNetwork
+
+class DummyRewardModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, obs, vec):
+        return torch.zeros_like(vec)[:,0]
+
 
 def train(
     log_dir, 
@@ -35,9 +44,6 @@ def train(
     epsilon
 ):
     
-    # init tensorboard writer
-    writer = SummaryWriter(log_dir)
-    
     # init optimizer
     optimizer = torch.optim.AdamW(q_net.parameters(), lr=lr, weight_decay=weight_decay)
     
@@ -47,7 +53,7 @@ def train(
     # init env
     env = gym.make(env_name)
     env = StateWrapper(env)
-    env = RewardWrapper(env, reward_model)
+    env = RewardActionWrapper(env_name, env, reward_model)
     obs = env.reset()
     done = False
     
@@ -55,10 +61,13 @@ def train(
     while steps < train_steps:
         steps += 1
         
+        estimated_episode_reward = 0
         while not done:
+            print(steps)
             # compute q values
             with torch.no_grad():
-                q_values = q_net.forward(**obs)
+                q_input = {'pov': torch.from_numpy(obs['pov'].copy())[None], 'vec': torch.from_numpy(obs['vec'].copy())[None]}
+                q_values = q_net.forward(**q_input)[0]
                 q_action = torch.argmax(q_values).item()
                 
             # sample action from epsilon-greedy behavior policy
@@ -70,14 +79,16 @@ def train(
                 action = q_action
             
             # take action
-            next_obs, reward, done, info = env.step(action)
+            next_obs, reward, done, info = env.step(np.array(action))
+            estimated_episode_reward += reward
 
             # compute next q values
-            next_q_values = q_net.forward(**next_obs)
+            q_input = {'pov': torch.from_numpy(next_obs['pov'].copy())[None], 'vec': torch.from_numpy(next_obs['vec'].copy())[None]}
+            next_q_values = q_net.forward(**q_input)[0]
             next_q_action = torch.argmax(next_q_values).item()
 
             # compute td error
-            td_error = torch.abs(reward + discount_factor * next_q_values[next_q_action] - q_values[action])
+            td_error = np.abs(reward + discount_factor * next_q_values[next_q_action].item() - q_values[action].item())
             
             # store transition
             transition = (
@@ -85,8 +96,8 @@ def train(
                 action,
                 next_obs,
                 reward,
-                None, #n_step_state TODO
-                0, #n_step_reward TODO
+                {'pov':np.array(0), 'vec':np.array(0)}, #n_step_state TODO
+                np.array(0), #n_step_reward TODO
                 td_error
             )
             dataset.add_agent_transition(transition)
@@ -96,13 +107,25 @@ def train(
             
             # sample a new batch from the dataset
             batch_idcs = dataset.combined_memory.sample(batch_size)
-            (pov, vec), (next_pov, next_vec), (n_step_pov, n_step_vec), action, reward, n_step_reward, idcs, weight, expert_mask = zip([dataset[idx] for idx in batch_idcs])
+            state, next_state, n_step_state, action, reward, n_step_reward, idcs, weights, expert_mask = zip(*[dataset[idx] for idx in batch_idcs])
+            pov, vec = zip(*state)
+            next_pov, next_vec = zip(*next_state)
+            #n_step_pov, n_step_vec = zip(*n_step_state)
+            pov = torch.from_numpy(np.array(pov))
+            vec = torch.from_numpy(np.array(vec))
+            next_pov = torch.from_numpy(np.array(next_pov))
+            next_vec = torch.from_numpy(np.array(next_vec))
+            #n_step_pov = torch.from_numpy(np.array(n_step_pov))
+            #n_step_vec = torch.from_numpy(np.array(n_step_vec))
+            reward = torch.from_numpy(np.array(reward))
+            weights = torch.from_numpy(np.array(weights))
+            expert_mask = torch.from_numpy(np.array(expert_mask))
 
             # compute q values
             q_values = q_net.forward(pov, vec)
             next_q_values = q_net.forward(next_pov, next_vec)
             next_target_q_values = target_q_net.forward(next_pov, next_vec)
-            n_step_q_values = q_net.forward(n_step_pov, n_step_vec)
+            #n_step_q_values = q_net.forward(n_step_pov, n_step_vec)
             
             # compute actions
             q_actions = torch.argmax(q_values, 1)
@@ -110,19 +133,19 @@ def train(
             next_target_q_action = torch.argmax(next_target_q_values, 1)
             
             # compute td error
-            updated_td_error = torch.abs(rew + discount_factor * next_q_values[next_q_action] - q_values[action])
+            updated_td_error = torch.abs(reward + discount_factor * next_q_values[torch.arange(batch_size), next_q_action] - q_values[torch.arange(batch_size), action])
 
             # zero gradients
             optimizer.zero_grad(set_to_none=True)
 
             ## compute loss
             # J_DQ
-            J_DQ = (reward + discount_factor * next_q_values[np.arange(len(next_q_values), next_target_q_action] - q_values[np.arange(len(q_values)), action]) ** 2
+            J_DQ = (reward + discount_factor * next_q_values[np.arange(batch_size), next_target_q_action] - q_values[np.arange(batch_size), action]) ** 2
             
             # J_E
             pre_max_q = q_values + supervised_loss_margin
-            pre_max_q[np.arange(len(action)), action] -= supervised_loss_margin
-            J_E = torch.max(pre_max_q, dim=1)[0] - q_values[np.arange(len(action)), action]
+            pre_max_q[np.arange(batch_size), action] -= supervised_loss_margin
+            J_E = torch.max(pre_max_q, dim=1)[0] - q_values[np.arange(batch_size), action]
             J_E = expert_mask * J_E # only compute it for expert actions
             
             # J_n
@@ -137,16 +160,16 @@ def train(
             # loss logging
             log_dict = {
                 'Training/total_loss': loss,
-                'Training/J_DQ': J_DQ.mean()
+                'Training/J_DQ': J_DQ.mean(),
                 'Training/J_E': J_E.sum() / expert_mask.sum(),
-                'Training/J_n', J_n.mean(),
+                'Training/J_n': J_n.mean(),
                 'Training/Step': steps
             }
             wandb.log(log_dict)
             
             # sample weight updating with td_error
             # (reward is always 0 in pretraining)
-            dataset.update_td_errors(batch_idcs, td_error)
+            dataset.update_td_errors(batch_idcs, updated_td_error)
             
             if steps % save_freq == 0:
                 print('Saving model...')
@@ -155,14 +178,19 @@ def train(
             if steps % update_freq == 0:
                 print('Updating target model...')
                 target_q_net = deepcopy(q_net)
-                
-    return q_net
+        print(f'\nEpisode ended! Estimated reward: {estimated_episode_reward}\n')        
+        wandb.log({'Training/Estimated Episode Reward': estimated_episode_reward})
 
+    return q_net
+    
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq):
     
-    wandb.init('DQfD_training')
+    wandb.init(project='DQfD_training')
+    
+    if reward_model_path is None:
+        print('\nWARNING!: DummyRewardModel will be used! If you are not currently debugging, you should change that!\n')
     
     # set save dir
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
@@ -176,7 +204,10 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     q_net = torch.load(model_path)
 
     # load reward model
-    reward_model = torch.load(reward_model_path)
+    if reward_model_path is None:
+        reward_model = DummyRewardModel()
+    else:
+        reward_model = torch.load(reward_model_path)
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -221,13 +252,12 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--new_model_path', type=str, required=True)
-    parser.add_argument('--reward_model_path', type=str, required=True)
+    parser.add_argument('--reward_model_path', type=str, default=None)#, required=True)
     parser.add_argument('--num_expert_episodes', type=int, default=100)
     parser.add_argument('--n_step', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--save_freq', type=int, default=100)
     parser.add_argument('--update_freq', type=int, default=100)
-    parser.add_argument('--action_repeat', type=int, default=1)
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--epsilon', type=float, default=0.01)
     parser.add_argument('--PER_exponent', type=float, default=0.4, help='PER exponent')

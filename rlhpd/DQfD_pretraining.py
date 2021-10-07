@@ -42,7 +42,7 @@ def pretrain(
         
         # get next batch
         batch_idcs = dataset.combined_memory.sample(batch_size)
-        state, next_state, _, cur_expert_action, _, _, idcs, weight = zip(*[dataset[idx] for idx in batch_idcs])
+        state, next_state, _, cur_expert_action, _, _, idcs, weight, _ = zip(*[dataset[idx] for idx in batch_idcs])
         pov, vec = zip(*state)
         next_pov, next_vec = zip(*next_state)
         pov = torch.from_numpy(np.array(pov))
@@ -52,9 +52,9 @@ def pretrain(
         weight = torch.from_numpy(np.array(weight))
 
         # forward pass
-        cur_q_values = q_net.forward(dict(pov=pov, vec=vec))
+        cur_q_values = q_net.forward(pov, vec)
         with torch.no_grad():
-            next_q_values = target_q_net.forward(dict(pov=next_pov, vec=next_vec))
+            next_q_values = target_q_net.forward(next_pov, next_vec)
         
         # zero gradients
         optimizer.zero_grad(set_to_none=True)

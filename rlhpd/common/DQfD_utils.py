@@ -9,29 +9,22 @@ from torch.utils.data import Dataset
 import minerl
 import gym
 
-from action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action
+from common.action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action, \
+                                    reverse_find_cave_action_simple, reverse_make_waterfall_action_simple, reverse_build_house_action, reverse_create_pen_action
+from common.state_shaping import preprocess_state
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
 
-# set items for preprocessing
-# TODO: incorporate stuff for village house
-all_inv_items = ['bucket','carrot','cobblestone','fence','fence_gate','snowball','stone_pickaxe','stone_shovel','water_bucket','wheat','wheat_seeds']
-all_equip_items = ['air','bucket','carrot','cobblestone','fence','fence_gate','none','other','snowball','stone_pickaxe','stone_shovel','water_bucket','wheat','wheat_seeds']
-all_inv_items.sort()
-all_equip_items.sort()
-INV_TO_IDX = {item: i for i, item in enumerate(all_inv_items)}
-EQUIP_TO_IDX = {item: i for i, item in enumerate(all_equip_items)}
-
-
 
 class ReplayBuffer(object):
 
-    def __init__(self, capacity, n_step, discount_factor, p_offset):
+    def __init__(self, capacity, n_step, discount_factor, p_offset, action_fn):
         self.n_step = n_step
         self.discount_factor = discount_factor
         self.p_offset = p_offset
         self.memory = deque([],maxlen=capacity)
+        self.action_fn = action_fn
         
         self.discount_array = np.array([self.discount_factor ** i for i in range(self.n_step)])
 
@@ -48,15 +41,15 @@ class ReplayBuffer(object):
         '''
         
         for t in range(len(obs)-self.n_step):
-            state = obs[t]
-            action = actions[t]
+            state = preprocess_state(obs[t])
+            action = self.action_fn(actions[t])[1]
             reward = rewards[t]
             td_error = td_errors[t]
             
             if t + self.n_step < len(obs):
-                n_step_state = obs[t+self.n_step]
+                next_state = preprocess_state(obs[t+1])
+                n_step_state = preprocess_state(obs[t+self.n_step])
                 n_step_reward = np.sum(rewards[t:t+self.n_step] * self.discount_array)
-                next_state = obs[t+1]
             else:
                 raise NotImplementedError(f't = {t}, len(obs) = {len(obs)}')
             self.push(
@@ -71,7 +64,7 @@ class ReplayBuffer(object):
 
 
 class CombinedMemory(object):
-    def __init__(self, agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent):
+    def __init__(self, agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn):
         '''
         Class to combine expert and agent memory
         '''
@@ -80,8 +73,8 @@ class CombinedMemory(object):
         self.PER_exponent = PER_exponent
         self.IS_exponent = IS_exponent
         self.memory_dict = {
-            'expert':ReplayBuffer(None, n_step, self.discount_factor, p_offset['expert']),
-            'agent':ReplayBuffer(agent_memory_capacity, n_step, self.discount_factor, p_offset['agent'])
+            'expert':ReplayBuffer(None, n_step, self.discount_factor, p_offset['expert'], action_fn),
+            'agent':ReplayBuffer(agent_memory_capacity, n_step, self.discount_factor, p_offset['agent'], action_fn)
         }
         
     def __len__(self):
@@ -102,9 +95,9 @@ class CombinedMemory(object):
         
     def __getitem__(self, idx):
         if idx < len(self.memory_dict['expert'].memory):
-            return self.memory_dict['expert'].memory[idx]
+            return (*self.memory_dict['expert'].memory[idx], 1)
         else:
-            return self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)]
+            return (*self.memory_dict['agent'].memory[idx-len(self.memory_dict['expert'].memory)], 0)
 
     def sample(self, batch_size):
         idcs = np.random.choice(np.arange(len(self)), size=batch_size, replace=False, p=self.weights/np.sum(self.weights))
@@ -129,6 +122,8 @@ class CombinedMemory(object):
         '''
         assert len(transition) == 7
         self.memory_dict['agent'].push(*transition)
+
+        self._update_weights()
         
 
  
@@ -150,58 +145,36 @@ class MemoryDataset(Dataset):
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
         self.env_name = env_name
-        self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent)
+        action_fn = {
+            'MineRLBasaltFindCave-v0':find_cave_action,
+            'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
+            'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
+            'MineRLBasaltBuildVillageHouse-v0':build_house_action
+        }[self.env_name]
+        self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
         
     def __len__(self):
         return len(self.combined_memory)
     
     def __getitem__(self, idx):
-        state, action, next_state, reward, n_step_state, n_step_reward, td_error = self.combined_memory[idx]
+        state, action, next_state, reward, n_step_state, n_step_reward, td_error, expert = self.combined_memory[idx]
 
-        processed_action = self._preprocess_action(action)
+        pov = state['pov']
+        next_pov = next_state['pov']
+        n_step_pov = n_step_state['pov']
 
-        pov = einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
-        next_pov = einops.rearrange(next_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
-        n_step_pov = einops.rearrange(n_step_state['pov'], 'h w c -> c h w').astype(np.float32) / 255
-
-        inv = self._preprocess_other_obs(state)
-        next_inv = self._preprocess_other_obs(next_state)
-        n_step_inv = self._preprocess_other_obs(n_step_state)
+        vec = state['vec']
+        next_vec = next_state['vec']
+        n_step_vec = n_step_state['vec']
 
         reward = reward.astype(np.float32)
         n_step_reward = n_step_reward.astype(np.float32)
         
         weight = self.weights[idx]
 
-        return (pov, inv), (next_pov, next_inv), (n_step_pov, n_step_inv), processed_action, reward, n_step_reward, idx, weight
+        return (pov, vec), (next_pov, next_vec), (n_step_pov, n_step_vec), action, reward, n_step_reward, idx, weight, expert
 
-    def _preprocess_action(self, action):
-        '''
-        Returns the shaped action, depending on the environment
-        '''
-        # very hacky but there seems to be a modification of the action going on
-        # TODO make this less hacky
-        new_action = deepcopy(action)
- 
-        action_dict, idx = {
-            'MineRLBasaltFindCave-v0':find_cave_action,
-            'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
-            'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
-            'MineRLBasaltBuildVillageHouse-v0':build_house_action
-        }[self.env_name](new_action)
-        
-        one_hot = np.array([*map(lambda x: x, action_dict.values())]).astype(np.float32)
-        
-        return one_hot
-        
-    
-    def _preprocess_other_obs(self, state):
-        '''
-        Takes a state dict and stacks all observations that do not belong to 'pov' into a single vector and returns this vector
-        '''
-        return preprocess_non_pov_obs(state)
-        
     def add_episode(self, obs, actions, rewards, td_errors, memory_id):
         self.combined_memory.add_episode(obs, actions, rewards, td_errors, memory_id)
     
@@ -245,24 +218,6 @@ class MemoryDataset(Dataset):
         '''
         self.combined_memory.add_agent_transition(transition)
 
-def preprocess_non_pov_obs(state):
-    # add damage vector to inv_obs
-    inv_obs = [state['equipped_items']['mainhand']['damage'], state['equipped_items']['mainhand']['maxDamage']]
-    
-    # get number of inventory items to one-hot encoded 'equip' type
-    inv = list(state['inventory'].values())
-    num_inv_items = len(inv) + 3 # in addition to inv items, we have 'air', 'other' and 'none'
-    equip = [0] * num_inv_items
-    equip[EQUIP_TO_IDX[state['equipped_items']['mainhand']['type']]] = 1
-    
-    # add equip type one-hot vector to inv_obs
-    inv_obs.extend(equip)
-    
-    # add inventory vector to inv_obs
-    inv_obs.extend(inv)
-    
-    return np.array(inv_obs).astype(np.float32)
-
 
 
 def loss_function(
@@ -288,24 +243,42 @@ def loss_function(
     loss = J_DQ + J_E + J_n
     return loss
 
-class StateWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
-        super().__init__()
-        self.env = env
-        
-    def observation(self, obs):
-        return {'pov':obs['pov'], 'vec':preprocess_non_pov_obs(obs)}
+
 
 class RewardWrapper(gym.Wrapper):
     def __init__(self, env, reward_model):
-        super().__init__()
+        super().__init__(env)
         self.env = env
         self.reward_model = reward_model
     
     def step(self, action):
         next_state, reward, done, info = self.env.step(action)
 
-        reward = self.reward_model(next_state['pov'], next_state['vec'])
+        reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
+        reward = reward.detach().cpu().numpy()
         
         return next_state, reward, done, info
 
+
+class RewardActionWrapper(gym.Wrapper):
+    def __init__(self, env_name, env, reward_model):
+        super().__init__(env)
+        self.env = env
+        self.env_name = env_name
+        self.reward_model = reward_model
+        self.env.action_space = gym.spaces.Discrete(11)
+    
+    def step(self, action):
+        # translate action to proper action dict
+        new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action_simple,
+            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action_simple,
+            'MineRLBasaltCreateVillageAnimalPen-v0':reverse_create_pen_action,
+            'MineRLBasaltBuildVillageHouse-v0':reverse_build_house_action
+        }[self.env_name](action)
+
+        next_state, reward, done, info = self.env.step(new_action)
+
+        reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
+        reward = reward.detach().cpu().numpy()
+        
+        return next_state, reward, done, info
