@@ -9,7 +9,8 @@
 # print(cfg.out.base_dir)
 
 env_task: MineRLBasaltFindCave-v0
-demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
+#demos_dir: #/home/junshern.chan/git/basalt-notyourrl/data
+demos_dir: /home/alex/minerl_data
 wandb_entity: junshern
 
 out:
@@ -70,9 +71,10 @@ sampler:
     num_traj: 5
     num_samples: 5
     sample_length: 20
-    pair_per_sample: 2
-    autolabel: True
-    autolabel_per_sample: 1
+    #pair_per_sample: 2
+    autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
+    autolabel_demo_per_sample: 1
+    autolabel_early_late_demos: True
 
 ###########
 # Rating
