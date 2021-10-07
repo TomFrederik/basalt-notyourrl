@@ -9,8 +9,8 @@
 # print(cfg.out.base_dir)
 
 env_task: MineRLBasaltFindCave-v0
-#demos_dir: #/home/junshern.chan/git/basalt-notyourrl/data
-demos_dir: /home/alex/minerl_data
+demos_dir: /home/junshern.chan/git/basalt-notyourrl/data
+#demos_dir: /home/alex/minerl_data
 wandb_entity: junshern
 
 out:
