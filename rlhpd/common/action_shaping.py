@@ -28,6 +28,25 @@ ACTION_PRIORITIES_SIMPLE = {
         'equip_stone_shovel': 6, 'equip_stone_pickaxe': 6,
         'equip_snowball': 7, 'use': 8
     },
+    'MineRLBasaltBuildVillageHouse-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_stone_pickaxe': 6, 'equip_stone_axe': 6, 'equip_cobblestone': 6,
+        'equip_stone_stairs': 6, 'equip_fence': 6, 'equip_acacia_fence': 6,
+        'equip_wooden_door': 6, 'equip_planks#0': 6, 'equip_log#0': 6,
+        'equip_glass': 6, 'equip_acacia_door': 6,'equip_planks#4': 6,
+        'equip_log2#0': 6, 'equip_wooden_pressure_plate': 6, 'equip_dirt': 6,
+        'equip_sandstone#0': 6, 'equip_sandstone#2': 6, 'equip_ladder': 6,
+        'equip_planks#1': 6, 'equip_log#1': 6, 'equip_spruce_door': 6, 'equip_torch': 6,
+        'equip_snowball': 7, 'use': 8
+    },
+    'MineRLBasaltCreateVillageAnimalPen-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_wheat': 6, 'equip_wheat_seeds': 6, 'equip_carrot': 6,
+        'equip_fence_gate': 6, 'equip_fence': 6,
+        'equip_snowball': 7, 'use': 8
+    }
 }
 
 INVENTORY = {
@@ -37,6 +56,16 @@ INVENTORY = {
     'MineRLBasaltMakeWaterfall-v0': [
         'snowball', 'water_bucket', 'cobblestone', 'bucket', 'stone_shovel', 'stone_pickaxe'
     ],
+    'MineRLBasaltBuildVillageHouse-v0': [
+        'stone_pickaxe', 'stone_axe', 'cobblestone', 'stone_stairs',
+        'fence', 'acacia_fence', 'wooden_door', 'planks#0', 'log#0', 'glass',
+        'snowball', 'acacia_door', 'planks#4', 'log2#0', 'wooden_pressure_plate',
+        'dirt', 'sandstone#0', 'sandstone#2', 'ladder', 'planks#1', 'log#1',
+        'spruce_door', 'torch'
+    ],
+    'MineRLBasaltCreateVillageAnimalPen-v0': [
+        'snowball', 'wheat', 'wheat_seeds', 'carrot', 'fence_gate', 'fence'
+    ]
 }
 
 
@@ -261,6 +290,68 @@ def make_waterfall_action_simple(action):
     # index actions
     action_final_prioritized_indexed, index = index_actions(
         action_final_prioritized, 6)  # 6 is index for "move forward"
+
+    return action_final_prioritized_indexed, index
+
+def build_house_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltBuildVillageHouse-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltBuildVillageHouse-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for 'move forward'
+
+    return action_final_prioritized_indexed, index
+
+def create_pen_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltCreateVillageAnimalPen-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltCreateVillageAnimalPen-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for 'move forward'
 
     return action_final_prioritized_indexed, index
 
