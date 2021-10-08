@@ -1,5 +1,6 @@
 # https://towardsdatascience.com/python-has-a-built-in-database-heres-how-to-use-it-47826c10648a
 import sqlite3
+import random
 from typing import List, Tuple 
 
 
@@ -59,6 +60,21 @@ class AnnotationBuffer:
         labels = [(line[2]) for line in rows]
         return rated_pairs, labels
 
+    def label_to_judgement(self, label):
+        """
+        1 : (1,0)
+        2 : (0,1)
+        3 : (0.5,0.5)
+        """
+        if label == 1:
+            return (1,0)
+        elif label == 2:
+            return (0,1)
+        elif label == 3:
+            return (0.5,0.5)
+        else:
+            raise ValueError(f"Invalid label {label}")
+
     def get_all_unrated_pairs(self) -> List[Tuple[str]]:
         self.c.execute('''SELECT * FROM trajectories WHERE preference = 0''') 
         unrated_pairs = self.c.fetchall()
@@ -75,6 +91,14 @@ class AnnotationBuffer:
         if len(unrated_pairs)==0:
             raise NoUnratedPair
         return (unrated_pairs[0][0], unrated_pairs[0][1])
+
+    def get_random_rated_pair(self) -> Tuple[str]:
+        self.c.execute('''SELECT * FROM trajectories WHERE preference = 2''') 
+        rated_pairs = self.c.fetchall()
+        if len(rated_pairs)==0:
+            raise NoUnratedPair
+        pair = random.choice(rated_pairs)
+        return (pair[0], pair[1])
 
     def get_rating_of_pair(self, left_id, right_id) -> int:
         """0 for unrated, 1 for left, 2 for right, 3 for equally good, 4 for undecided"""

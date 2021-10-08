@@ -14,9 +14,9 @@ def save_vid(pickle_path, video_path, fps):
         clip = pickle.load(f)
     assert len(clip) > 0
     imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
-    st.write(clip[0][0]['equipped_items'])
-    st.write(clip[0][0]['inventory'])
-    st.write(str(clip[0][0]['vec']))
+    # st.write(clip[0][0]['equipped_items'])
+    # st.write(clip[0][0]['inventory'])
+    # st.write(str(clip[0][0]['vec']))
 
     video_path.parent.mkdir(parents=True, exist_ok=True)    
     writer = skvideo.io.FFmpegWriter(
@@ -51,6 +51,7 @@ class App:
         instructions = st.container()
         number_left = st.container()
         left, right = st.columns(2)
+        just_browsing = st.container()
         equally_good = st.container()
         ask_for_new = st.container()
 
@@ -66,7 +67,7 @@ class App:
         # videos will names as ids, same as in table
         # do pre-populated database in previous step that doesn't have the choices yet
         # load the pair vids from the database
-        left_id, right_id = self.db.get_one_unrated_pair()
+        left_id, right_id = self.db.get_random_rated_pair()
 
         with left:
             st.write(f"Video ID: `{left_id}`")
@@ -84,6 +85,10 @@ class App:
             video_bytes = video_file.read()
             st.video(video_bytes)
 
+        with just_browsing:
+            browse_labelled = st.button("I want to see a labelled pair")
+            if browse_labelled:
+                left_id, right_id = self.db.get_random_rated_pair()
         with left:
             choose_left = st.button(
                 'The left one is better', key = "left")
@@ -108,6 +113,7 @@ class App:
             if undecided:
                 self.db.rate_traj_pair(left_id, right_id, 4)
                 left_id, right_id = self.db.get_one_unrated_pair()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Rate clips in annotation buffer')

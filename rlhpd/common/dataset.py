@@ -34,7 +34,7 @@ class TrajectoryPreferencesDataset(Dataset):
             path_pairs = [
                 ((self.data_dir / l).with_suffix('.pickle'), (self.data_dir / r).with_suffix('.pickle')) 
                 for l, r in id_pairs]
-            self.labels = labels
+            self.labels = [db.label_to_judgement(l) for l in labels]
         else:
             # If annotation_db not given, assume that we have reward-labelled clips
             # so we can just load any pair of clips and simulate the judgement ourselves
@@ -55,7 +55,7 @@ class TrajectoryPreferencesDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        Loads a batch of data
+        Loads a single sample of data
         """
         # Load from file
         traj_path_a, traj_path_b = self.traj_path_pairs[idx]
@@ -63,13 +63,13 @@ class TrajectoryPreferencesDataset(Dataset):
             clip_a = pickle.load(f)
         with open(traj_path_b, 'rb') as f:
             clip_b = pickle.load(f)
-        assert len(clip_a) == len(clip_b)
+        assert len(clip_a) == len(clip_b), (traj_path_a, traj_path_b)
 
         if self.labels is None:
             # Compute judgement based on rewards
             judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
         else:
-            judgement = torch.as_tensor(self.labels)
+            judgement = torch.as_tensor(self.labels[idx])
 
         # Preprocess images
         frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)

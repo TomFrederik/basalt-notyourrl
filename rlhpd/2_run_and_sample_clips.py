@@ -17,7 +17,7 @@ import minerl  # This is required to be able to import minerl environments
 import numpy as np
 from tqdm import tqdm
 
-from common import database, utils, DQfD_utils
+from common import database, utils, state_shaping
 
 
 class DataBaseFiller:
@@ -95,6 +95,7 @@ class DataBaseFiller:
         assert self.max_traj_length > self.sample_length
         starting_idx = self.rng.integers(low=0, high=self.max_traj_length-self.sample_length)
         sample = trajectory[starting_idx : starting_idx+self.sample_length]
+        assert len(sample) == self.sample_length # Don't accept samples of different lengths!
         return sample
 
     @staticmethod
@@ -156,13 +157,13 @@ class DataBaseFiller:
         random_clip = data_frames[start_idx: start_idx + self.sample_length]
         end_clip = data_frames[len(data_frames)-self.sample_length: len(data_frames)]
         # Insert flattened vector representation of dictionary states
-        # Mimics what the DQfD_utils.StateWrapper does, but for the demo actions
+        # Mimics what the state_shaping.StateWrapper does, but for the demo actions
         for frame in random_clip:
             state, action, reward, next_state, done, meta = frame
-            frame[0]['vec'] = DQfD_utils.preprocess_non_pov_obs(state)
+            frame[0]['vec'] = state_shaping.preprocess_non_pov_obs(state)
         for frame in end_clip:
             state, action, reward, next_state, done, meta = frame
-            frame[0]['vec'] = DQfD_utils.preprocess_non_pov_obs(state)
+            frame[0]['vec'] = state_shaping.preprocess_non_pov_obs(state)
         return random_clip, end_clip
     
     def _do_autolabels(self):
@@ -214,7 +215,7 @@ if __name__ == '__main__':
     env_task = cfg.env_task
     print(f"Initializing environment {env_task}. This might take a while...")
     env = gym.make(env_task)
-    env = DQfD_utils.StateWrapper(env)
+    env = state_shaping.StateWrapper(env)
     print("Done initializing environment!")
 
     db_filler = DataBaseFiller(cfg=cfg, env=env)

@@ -22,6 +22,9 @@ class RewardModel(nn.Module):
         channel = 16
         relu_negative_slope = 0.01
         dropout_rate = 0.2
+        conv_out_size = 64
+        # TODO: vec_size == vec.shape[1] (This needs to adapted for each environment)
+        vec_size = 27 # findCave
         self.conv = nn.Sequential(
             nn.Conv2d(3, channel, 7, stride=3),
             nn.BatchNorm2d(channel),
@@ -44,11 +47,11 @@ class RewardModel(nn.Module):
             nn.LeakyReLU(negative_slope=relu_negative_slope, inplace=True),
             
             nn.Flatten(),
-            nn.Linear(256, 64),
+            nn.Linear(256, conv_out_size),
             # nn.Linear(64, 1),
         )
         self.mlp = nn.Sequential(
-            nn.Linear(64 + 64, 10),
+            nn.Linear(conv_out_size + vec_size, 10),
             nn.ReLU(inplace=True),
             nn.Linear(10, 1),
         )

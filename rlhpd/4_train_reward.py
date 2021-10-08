@@ -78,7 +78,7 @@ if __name__ == '__main__':
         betas=cfg.reward.adam_betas,
         eps=cfg.reward.adam_eps)
 
-    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.traj_dir)
+    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.traj_dir, cfg.sampler.db_path)
     val_size = int(cfg.reward.val_split * len(full_dataset))
     train_size = len(full_dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
@@ -98,14 +98,15 @@ if __name__ == '__main__':
             # Run prediction pipeline
             prefer_probs, pred_rewards = pref.predict_pref_probs(
                 reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=True)
-            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.sampler.clip_length,),\
-                (pred_rewards.shape, (len(frames_a) * 2 * cfg.sampler.clip_length,))
+            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.sampler.sample_length,),\
+                (pred_rewards.shape, (len(frames_a) * 2 * cfg.sampler.sample_length,))
 
             # Calculate loss:
             # This is almost CrossEntropy but slightly different because we want to support
             # tie condition (0.5, 0.5) in judgement which is not possible in default XEnt
             # loss = - (judgement[0] * torch.log(prefer_1) + judgement[1] * torch.log(prefer_2))
-            assert judgements.shape == prefer_probs.shape
+            assert judgements.shape == prefer_probs.shape,\
+                (judgements.shape, prefer_probs.shape)
             loss = - torch.sum(judgements * torch.log(prefer_probs))
             # An extra loss proportional to the square of the predicted rewards is added 
             # to impose a zero-mean Gaussian prior on the reward distribution.
