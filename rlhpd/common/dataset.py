@@ -74,10 +74,10 @@ class TrajectoryPreferencesDataset(Dataset):
         # Preprocess images
         frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
-        vec_a = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
+        vec_a = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
         frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
         frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
-        vec_b = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
+        vec_b = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
 
         sample = {
             # State a

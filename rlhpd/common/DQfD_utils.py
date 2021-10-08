@@ -9,9 +9,10 @@ from torch.utils.data import Dataset
 import minerl
 import gym
 
-from common.action_shaping import find_cave_action, make_waterfall_action, build_house_action, create_pen_action, \
-                                    reverse_find_cave_action_simple, reverse_make_waterfall_action_simple, reverse_build_house_action, reverse_create_pen_action
-from common.state_shaping import preprocess_state
+from .action_shaping import find_cave_action, make_waterfall_action, build_house_action,\
+    create_pen_action, reverse_find_cave_action_simple, reverse_make_waterfall_action_simple, \
+    reverse_build_house_action, reverse_create_pen_action
+from .state_shaping import preprocess_state
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'n_step_state', 'n_step_reward', 'td_error'))
@@ -242,7 +243,6 @@ def loss_function(
     
     loss = J_DQ + J_E + J_n
     return loss
-
 
 
 class RewardWrapper(gym.Wrapper):

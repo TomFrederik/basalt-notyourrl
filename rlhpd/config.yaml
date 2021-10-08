@@ -84,6 +84,10 @@ rate_ui:
     videos_dir: ./output/videos
     video_fps: 20
 
+###########
+# Reward
+###########
+
 reward:
     wandb_project: 4-train-reward
     save_dir: ./output/reward_models

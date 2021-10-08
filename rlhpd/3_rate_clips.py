@@ -14,6 +14,9 @@ def save_vid(pickle_path, video_path, fps):
         clip = pickle.load(f)
     assert len(clip) > 0
     imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
+    st.write(clip[0][0]['equipped_items'])
+    st.write(clip[0][0]['inventory'])
+    st.write(str(clip[0][0]['vec']))
 
     video_path.parent.mkdir(parents=True, exist_ok=True)    
     writer = skvideo.io.FFmpegWriter(

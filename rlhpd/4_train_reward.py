@@ -62,8 +62,8 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
-    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
+    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
 
     save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         betas=cfg.reward.adam_betas,
         eps=cfg.reward.adam_eps)
 
-    full_dataset = TrajectoryPreferencesDataset(cfg.clips.dir)
+    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.traj_dir)
     val_size = int(cfg.reward.val_split * len(full_dataset))
     train_size = len(full_dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
@@ -98,8 +98,8 @@ if __name__ == '__main__':
             # Run prediction pipeline
             prefer_probs, pred_rewards = pref.predict_pref_probs(
                 reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=True)
-            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.clips.clip_length,),\
-                (pred_rewards.shape, (len(frames_a) * 2 * cfg.clips.clip_length,))
+            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.sampler.clip_length,),\
+                (pred_rewards.shape, (len(frames_a) * 2 * cfg.sampler.clip_length,))
 
             # Calculate loss:
             # This is almost CrossEntropy but slightly different because we want to support

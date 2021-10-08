@@ -17,7 +17,7 @@ import minerl  # This is required to be able to import minerl environments
 import numpy as np
 from tqdm import tqdm
 
-from common import database, utils
+from common import database, utils, DQfD_utils
 
 
 class DataBaseFiller:
@@ -155,8 +155,15 @@ class DataBaseFiller:
         start_idx = self.rng.integers(low=0, high=len(data_frames)-self.sample_length-1)
         random_clip = data_frames[start_idx: start_idx + self.sample_length]
         end_clip = data_frames[len(data_frames)-self.sample_length: len(data_frames)]
+        # Insert flattened vector representation of dictionary states
+        # Mimics what the DQfD_utils.StateWrapper does, but for the demo actions
+        for frame in random_clip:
+            state, action, reward, next_state, done, meta = frame
+            frame[0]['vec'] = DQfD_utils.preprocess_non_pov_obs(state)
+        for frame in end_clip:
+            state, action, reward, next_state, done, meta = frame
+            frame[0]['vec'] = DQfD_utils.preprocess_non_pov_obs(state)
         return random_clip, end_clip
-
     
     def _do_autolabels(self):
         """ Pairs each newly generated sample with a random sample from the demonstrations"""
@@ -185,7 +192,6 @@ class DataBaseFiller:
                     except:
                         continue
 
-
     def run(self):
         print("Generating clips from policy...")
         self._save_all_traj_and_samples()
@@ -207,10 +213,11 @@ if __name__ == '__main__':
     # Load env
     env_task = cfg.env_task
     print(f"Initializing environment {env_task}. This might take a while...")
-    environment = gym.make(env_task)
+    env = gym.make(env_task)
+    env = DQfD_utils.StateWrapper(env)
     print("Done initializing environment!")
 
-    db_filler = DataBaseFiller(cfg=cfg, env=environment)
+    db_filler = DataBaseFiller(cfg=cfg, env=env)
     db_filler.run()
 
     

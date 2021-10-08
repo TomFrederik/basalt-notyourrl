@@ -33,7 +33,11 @@ def preprocess_pov_obs(state):
     return einops.rearrange(state['pov'], 'h w c -> c h w').astype(np.float32) / 255
 
 def preprocess_state(state):
-    return {'pov':preprocess_pov_obs(state), 'vec':preprocess_non_pov_obs(state)}
+    # Append a new flattened 'vec' attribute to the state; 'vec' contains the same info
+    # as state['equipped_items'] and state['inventory'], we leave those in only for
+    # debugging purposes (they will not be used by the agent)
+    state['vec'] = preprocess_non_pov_obs(state)
+    return state
 
 class StateWrapper(gym.ObservationWrapper):
     def __init__(self, env):
