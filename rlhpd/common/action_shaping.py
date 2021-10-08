@@ -28,6 +28,25 @@ ACTION_PRIORITIES_SIMPLE = {
         'equip_stone_shovel': 6, 'equip_stone_pickaxe': 6,
         'equip_snowball': 7, 'use': 8
     },
+    'MineRLBasaltBuildVillageHouse-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_stone_pickaxe': 6, 'equip_stone_axe': 6, 'equip_cobblestone': 6,
+        'equip_stone_stairs': 6, 'equip_fence': 6, 'equip_acacia_fence': 6,
+        'equip_wooden_door': 6, 'equip_planks#0': 6, 'equip_log#0': 6,
+        'equip_glass': 6, 'equip_acacia_door': 6,'equip_planks#4': 6,
+        'equip_log2#0': 6, 'equip_wooden_pressure_plate': 6, 'equip_dirt': 6,
+        'equip_sandstone#0': 6, 'equip_sandstone#2': 6, 'equip_ladder': 6,
+        'equip_planks#1': 6, 'equip_log#1': 6, 'equip_spruce_door': 6, 'equip_torch': 6,
+        'equip_snowball': 7, 'use': 8
+    },
+    'MineRLBasaltCreateVillageAnimalPen-v0': {
+        'forward': 0, 'left': 1, 'right': 1, 'back': 2, 'jump': 3, 'attack': 4,
+        'camera_down': 5, 'camera_left': 5, 'camera_right': 5, 'camera_up': 5,
+        'equip_wheat': 6, 'equip_wheat_seeds': 6, 'equip_carrot': 6,
+        'equip_fence_gate': 6, 'equip_fence': 6,
+        'equip_snowball': 7, 'use': 8
+    }
 }
 
 INVENTORY = {
@@ -37,6 +56,16 @@ INVENTORY = {
     'MineRLBasaltMakeWaterfall-v0': [
         'snowball', 'water_bucket', 'cobblestone', 'bucket', 'stone_shovel', 'stone_pickaxe'
     ],
+    'MineRLBasaltBuildVillageHouse-v0': [
+        'stone_pickaxe', 'stone_axe', 'cobblestone', 'stone_stairs',
+        'fence', 'acacia_fence', 'wooden_door', 'planks#0', 'log#0', 'glass',
+        'snowball', 'acacia_door', 'planks#4', 'log2#0', 'wooden_pressure_plate',
+        'dirt', 'sandstone#0', 'sandstone#2', 'ladder', 'planks#1', 'log#1',
+        'spruce_door', 'torch'
+    ],
+    'MineRLBasaltCreateVillageAnimalPen-v0': [
+        'snowball', 'wheat', 'wheat_seeds', 'carrot', 'fence_gate', 'fence'
+    ]
 }
 
 
@@ -264,6 +293,68 @@ def make_waterfall_action_simple(action):
 
     return action_final_prioritized_indexed, index
 
+def build_house_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltBuildVillageHouse-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltBuildVillageHouse-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for 'move forward'
+
+    return action_final_prioritized_indexed, index
+
+def create_pen_action_simple(action):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY['MineRLBasaltCreateVillageAnimalPen-v0'])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    # prioritize actions
+    action_final_prioritized = prioritize_actions(
+        action_final, act_prior=ACTION_PRIORITIES_SIMPLE['MineRLBasaltCreateVillageAnimalPen-v0'])
+
+    # index actions
+    action_final_prioritized_indexed, index = index_actions(
+        action_final_prioritized, 6)  # 6 is index for 'move forward'
+
+    return action_final_prioritized_indexed, index
+
 def make_waterfall_action(action):
     #TODO
     raise NotImplementedError
@@ -476,6 +567,203 @@ def reverse_make_waterfall_action_simple(action):
         ('equip_bucket', 0),
         ('equip_stone_shovel', 0),
         ('equip_stone_pickaxe', 0),
+        ('jump', 0),
+        ('left', 0),
+        ('right', 0),
+        ('use', 0)
+    ])
+    """
+
+def reverse_build_house_action_simple(action):
+    # assert isinstance(action, int), f"{type(action) = }"
+
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
+
+    if action == 0:
+        action_dict['attack'] = np.array(1)
+    elif action == 1:
+        action_dict['back'] = np.array(1)
+    elif action == 2:
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 3:
+        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 4:
+        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 5:
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 6:
+        action_dict['forward'] = np.array(1)
+    elif action == 7:
+        action_dict['equip'] = 'stone_pickaxe' # equip
+    elif action == 8:
+        action_dict['equip'] = 'stone_axe' # equip
+    elif action == 9:
+        action_dict['equip'] = 'cobblestone' # equip
+    elif action == 10:
+        action_dict['equip'] = 'stone_stairs' # equip
+    elif action == 11:
+        action_dict['equip'] = 'fence' # equip
+    elif action == 12:
+        action_dict['equip'] = 'acacia_fence' # equip
+    elif action == 13:
+        action_dict['equip'] = 'wooden_door' # equip
+    elif action == 14:
+        action_dict['equip'] = 'planks#0' # equip
+    elif action == 15:
+        action_dict['equip'] = 'log#0' # equip
+    elif action == 16:
+        action_dict['equip'] = 'glass' # equip
+    elif action == 17:
+        action_dict['equip'] = 'snowball' # equip
+    elif action == 18:
+        action_dict['equip'] = 'acacia_door' # equip
+    elif action == 19:
+        action_dict['equip'] = 'planks#4' # equip
+    elif action == 20:
+        action_dict['equip'] = 'log2#0' # equip
+    elif action == 21:
+        action_dict['equip'] = 'wooden_pressure_plate' # equip
+    elif action == 22:
+        action_dict['equip'] = 'sandstone#0' # equip
+    elif action == 23:
+        action_dict['equip'] = 'sandstone#2' # equip
+    elif action == 24:
+        action_dict['equip'] = 'ladder' # equip
+    elif action == 25:
+        action_dict['equip'] = 'planks#1' # equip
+    elif action == 26:
+        action_dict['equip'] = 'log#1' # equip
+    elif action == 27:
+        action_dict['equip'] = 'spruce_door' # equip
+    elif action == 28:
+        action_dict['equip'] = 'torch' # equip
+    elif action == 29:
+        action_dict['jump'] = np.array(1)
+    elif action == 30:
+        action_dict['left'] = np.array(1)
+    elif action == 31:
+        action_dict['right'] = np.array(1)
+    elif action == 32:
+        action_dict['use'] = np.array(1) # use
+    
+    """
+    OrderedDict([
+        ('attack', 0),
+        ('back', 0),
+        ('camera_down', 0),
+        ('camera_left', 0),
+        ('camera_right', 0),
+        ('camera_up', 0),
+        ('forward', 0),
+        ('equip_stone_pickaxe', 0),
+        ('equip_stone_axe', 0),
+        ('equip_cobblestone', 0),
+        ('equip_stone_stairs', 0),
+        ('equip_fence', 0),
+        ('equip_acacia_fence', 0),
+        ('equip_wooden_door', 0),
+        ('equip_planks#0', 0),
+        ('equip_log#0', 0),
+        ('equip_glass', 0),
+        ('equip_snowball', 0),
+        ('equip_acacia_door', 0),
+        ('equip_planks#4', 0),
+        ('equip_log2#0', 0),
+        ('equip_wooden_pressure_plate', 0),
+        ('equip_dirt', 0),
+        ('equip_sandstone#0', 0),
+        ('equip_sandstone#2', 0),
+        ('equip_ladder', 0),
+        ('equip_planks#1', 0),
+        ('equip_log#1', 0),
+        ('equip_spruce_door', 0),
+        ('equip_torch', 0),
+        ('jump', 0),
+        ('left', 0),
+        ('right', 0),
+        ('use', 0)
+    ])
+    """
+
+def reverse_create_pen_action_simple(action):
+    # assert isinstance(action, int), f"{type(action) = }"
+
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
+
+    if action == 0:
+        action_dict['attack'] = np.array(1)
+    elif action == 1:
+        action_dict['back'] = np.array(1)
+    elif action == 2:
+        action_dict['camera'] = np.array([-PITCH_MARGIN, 0]).astype(np.float32) # down
+    elif action == 3:
+        action_dict['camera'] =  np.array([0, -YAW_MARGIN]).astype(np.float32) # left
+    elif action == 4:
+        action_dict['camera'] =  np.array([0, YAW_MARGIN]).astype(np.float32) # right
+    elif action == 5:
+        action_dict['camera'] = np.array([PITCH_MARGIN, 0]).astype(np.float32) # up
+    elif action == 6:
+        action_dict['forward'] = np.array(1)
+    elif action == 7:
+        action_dict['equip'] = 'snowball' # equip
+    elif action == 8:
+        action_dict['equip'] = 'wheat' # equip
+    elif action == 9:
+        action_dict['equip'] = 'wheat_seeds' # equip
+    elif action == 10:
+        action_dict['equip'] = 'carrot' # equip
+    elif action == 11:
+        action_dict['equip'] = 'fence_gate' # equip
+    elif action == 12:
+        action_dict['equip'] = 'fence' # equip
+    elif action == 13:
+        action_dict['jump'] = np.array(1)
+    elif action == 14:
+        action_dict['left'] = np.array(1)
+    elif action == 15:
+        action_dict['right'] = np.array(1)
+    elif action == 16:
+        action_dict['use'] = np.array(1) # use
+    
+    """
+    OrderedDict([
+        ('attack', 0),
+        ('back', 0),
+        ('camera_down', 0),
+        ('camera_left', 0),
+        ('camera_right', 0),
+        ('camera_up', 0),
+        ('forward', 0),
+        ('equip_snowball', 0),
+        ('equip_wheat', 0),
+        ('equip_wheat_seeds', 0),
+        ('equip_carrot', 0),
+        ('equip_fence_gate', 0),
+        ('equip_fence', 0),
         ('jump', 0),
         ('left', 0),
         ('right', 0),
