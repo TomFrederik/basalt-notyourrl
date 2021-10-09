@@ -1,43 +1,25 @@
 import argparse
-import pickle
 from pathlib import Path
 
 import numpy as np
-import skvideo.io
 import streamlit as st
+import torch
 
-from common import database, utils
+from common import database, utils, preference_helpers
+from common.reward_model import RewardModel
 
-
-def save_vid(pickle_path, video_path, fps):
-    with open(pickle_path, 'rb') as f:
-        clip = pickle.load(f)
-    assert len(clip) > 0
-    imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip])
-    # st.write(clip[0][0]['equipped_items'])
-    # st.write(clip[0][0]['inventory'])
-    # st.write(str(clip[0][0]['vec']))
-
-    video_path.parent.mkdir(parents=True, exist_ok=True)    
-    writer = skvideo.io.FFmpegWriter(
-        video_path, 
-        inputdict={'-r': str(fps)},
-        outputdict={'-r': str(fps), '-vcodec': 'libx264'},
-        )
-    for idx in range(imgs.shape[0]):
-        writer.writeFrame(imgs[idx,...])
-    writer.close()
 
 class App:
-    def __init__(self, db_path, videos_dir, traj_dir, video_fps) -> None:
+    def __init__(self, cfg) -> None:
         st.set_page_config(page_title="Human preferences user interface", page_icon=None, layout='wide')
         st.title("Human preferences user interface")
-
+        
         # TODO: Cache so Streamlit doesn't run it on every refresh
-        self.videos_dir = Path(videos_dir)
-        self.db = database.AnnotationBuffer(db_path)
-        self.video_fps = video_fps
+        self.videos_dir = Path(cfg.rate_ui.videos_dir)
+        self.db = database.AnnotationBuffer(cfg.sampler.db_path)
+        self.video_fps = cfg.rate_ui.video_fps
         self.load_css("style.css")
+        self.reward_model_path = Path(cfg.reward.best_model_path)
         return
 
     def load_css(self, css_file):
@@ -45,77 +27,109 @@ class App:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
         return
 
+    # @st.cache(suppress_st_warning=True, allow_output_mutation=True, max_entries=1)
+    def load_model(self, model_path):
+        self.model = RewardModel()
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.eval()
+
     def run(self):
 
-        instructions = st.container()
-        number_left = st.container()
-        left, right = st.columns(2)
-        just_browsing = st.container()
-        equally_good = st.container()
-        ask_for_new = st.container()
+        left_id, right_id, pref = self.db.get_random_rated_tuple()
 
         with st.sidebar:
             st.write("Instructions:")
             st.write("Pick the video you prefer for now :)")
 
-            # with number_left:
-            # st.write(self.db.return_all_data())
             st.write(f"Trajectory pairs waiting to be rated: {self.db.get_number_of_unrated_pairs()}")
 
-        # check folder for videos
-        # videos will names as ids, same as in table
-        # do pre-populated database in previous step that doesn't have the choices yet
-        # load the pair vids from the database
-        left_id, right_id, pref = self.db.get_random_rated_tuple()
+            evaluate_model = st.checkbox("Evaluate model", value=False)
+            if evaluate_model:
+                self.load_model(self.reward_model_path)
+                st.write(f"Using model: `{self.reward_model_path}`")
+
+            if st.button("Show me another labelled pair"):
+                left_id, right_id, pref = self.db.get_random_rated_tuple()
+
+        left, right = st.columns(2)
 
         with left:
-            st.write(f"`{left_id}`")
+            st.write(f"`{Path(left_id).parent}`")
+            st.write(f"`{Path(left_id).name}`")
             vid_path = self.videos_dir / "left.mp4"
-            save_vid(left_id, vid_path, self.video_fps)
-            video_file = open(vid_path, 'rb')
-            video_bytes = video_file.read()
+            clip_1 = utils.load_clip_from_file(left_id)
+            imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip_1])
+            utils.save_vid(imgs, vid_path, self.video_fps)
+            # st.write(clip[0][0]['equipped_items'])
+            # st.write(clip[0][0]['inventory'])
+            # st.write(str(clip[0][0]['vec']))
+            with open(vid_path, 'rb') as video_file:
+                video_bytes = video_file.read()
             st.video(video_bytes)
             if pref == 1:
-                st.success("THIS IS BETTER")
-
+                st.success("True label: Better")
+            else:
+                st.info("True label: Worse")
+            
         with right:
-            st.write(f"`{right_id}`")
+            st.write(f"`{Path(right_id).parent}`")
+            st.write(f"`{Path(right_id).name}`")
             vid_path = self.videos_dir / "right.mp4"
-            save_vid(right_id, vid_path, self.video_fps)
-            video_file = open(vid_path, 'rb')
-            video_bytes = video_file.read()
+            clip_2 = utils.load_clip_from_file(right_id)
+            imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip_2])
+            utils.save_vid(imgs, vid_path, self.video_fps)
+            with open(vid_path, 'rb') as video_file:
+                video_bytes = video_file.read()
             st.video(video_bytes)
             if pref == 2:
-                st.success("THIS IS BETTER")
+                st.success("True label: Better")
+            else:
+                st.info("True label: Worse")
+            
+        if evaluate_model:
+            imgs_1, vecs_1 = utils.get_frames_and_vec_from_clip(clip_1)
+            imgs_2, vecs_2 = utils.get_frames_and_vec_from_clip(clip_2)
+            pred_reward_1 = self.model(imgs_1, vecs_1).sum().item()
+            pred_reward_2 = self.model(imgs_2, vecs_2).sum().item()
 
-        with just_browsing:
-            browse_labelled = st.button("I want to see a labelled pair")
-            if browse_labelled:
-                left_id, right_id, pref = self.db.get_random_rated_tuple()
+            probs = preference_helpers.predict_pref_probs(
+                self.model, imgs_1.unsqueeze(0), imgs_2.unsqueeze(0), vecs_1.unsqueeze(0), vecs_2.unsqueeze(0))
+            probs = probs.detach().numpy()
+            pred_judgement = tuple(preference_helpers.probs_to_judgements(probs).squeeze())
+            info_1 = f"Pred reward: {pred_reward_1:.3f} (P = {probs.squeeze()[0]:.2f} )"
+            info_2 = f"Pred reward: {pred_reward_2:.3f} (P = {probs.squeeze()[1]:.2f} )"
+            if pred_judgement == (0.5, 0.5):
+                with left:
+                    st.info(info_1)
+                with right:
+                    st.info(info_2)
+            elif pred_judgement == (1, 0):
+                with left:
+                    st.success(info_1)
+                with right:
+                    st.info(info_2)
+            else: # pred_judgement == (0, 1)
+                with left:
+                    st.info(info_1)
+                with right:
+                    st.success(info_2)
+            # st.write(probs)
+
+        # Feedback
         with left:
-            choose_left = st.button(
-                'The left one is better', key = "left")
-            if choose_left:
+            if st.button('Left is better'):
                 self.db.rate_traj_pair(left_id, right_id, 1)
                 left_id, right_id = self.db.get_one_unrated_pair()
         with right:
-            choose_right = st.button(
-                'The right one is better', key = "right")
-            if choose_right:
+            if st.button('Right is better'):
                 self.db.rate_traj_pair(left_id, right_id, 2)
                 left_id, right_id = self.db.get_one_unrated_pair()
-        with equally_good:
-            equal = st.button(
-                'Both are equally good')
-            if equal:
-                self.db.rate_traj_pair(left_id, right_id, 3)
-                left_id, right_id = self.db.get_one_unrated_pair()
-        with ask_for_new:
-            undecided = st.button(
-                'Cannot decide, give me a new one!')
-            if undecided:
-                self.db.rate_traj_pair(left_id, right_id, 4)
-                left_id, right_id = self.db.get_one_unrated_pair()
+        if st.button('Both are equally good'):
+            self.db.rate_traj_pair(left_id, right_id, 3)
+            left_id, right_id = self.db.get_one_unrated_pair()
+        if st.button('Cannot decide, give me a new one!'):
+            self.db.rate_traj_pair(left_id, right_id, 4)
+            left_id, right_id = self.db.get_one_unrated_pair()
 
 
 if __name__ == '__main__':
@@ -126,10 +140,5 @@ if __name__ == '__main__':
 
     cfg = utils.load_config(options.config_file)
 
-    app = App(
-        db_path=cfg.sampler.db_path,
-        videos_dir=cfg.rate_ui.videos_dir,
-        traj_dir=cfg.sampler.traj_dir,
-        video_fps=cfg.rate_ui.video_fps,
-    )
+    app = App(cfg)
     app.run()

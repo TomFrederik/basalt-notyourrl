@@ -62,8 +62,8 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
-    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
+    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
 
     save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -90,6 +90,10 @@ if __name__ == '__main__':
     for epoch in range(cfg.reward.num_epochs):
         print("Epoch", epoch)
         for batch_idx, data_batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
+            if samples_count > cfg.reward.max_num_pairs:
+                print(f"Hit max_num_pairs ({samples_count} / {cfg.reward.max_num_pairs}), quitting.")
+                break
+
             frames_a, frames_b, vec_a, vec_b, judgements = \
                 data_batch['frames_a'], data_batch['frames_b'], \
                 data_batch['vec_a'], data_batch['vec_b'], \
@@ -132,11 +136,11 @@ if __name__ == '__main__':
             
             samples_count += len(frames_a)
 
-        # Save model
-        if epoch % cfg.reward.save_every_n_epoch == 0:
-            save_path = save_dir / f"{samples_count:06d}.pt"
-            torch.save(reward_model.state_dict(), save_path)
-            print("Saved model to", save_path)
+            # Save model
+            if batch_idx % cfg.reward.save_every_n_batch == 0:
+                save_path = save_dir / f"{samples_count:06d}.pt"
+                torch.save(reward_model.state_dict(), save_path)
+                print("Saved model to", save_path)
 
         # TODO: A fraction of 1/e of the data is held out to be used as a validation set. 
         # We use L2- regularization of network weights with the adaptive scheme described in 

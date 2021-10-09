@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from . import preference_helpers as pref
+from . import utils
 from .database import AnnotationBuffer
 
 class TrajectoryPreferencesDataset(Dataset):
@@ -30,10 +31,7 @@ class TrajectoryPreferencesDataset(Dataset):
 
         if annotation_db_path is not None:
             db = AnnotationBuffer(annotation_db_path)
-            id_pairs, labels = db.get_all_rated_pairs_with_labels()
-            path_pairs = [
-                ((self.data_dir / l).with_suffix('.pickle'), (self.data_dir / r).with_suffix('.pickle')) 
-                for l, r in id_pairs]
+            path_pairs, labels = db.get_all_rated_pairs_with_labels()
             self.labels = [db.label_to_judgement(l) for l in labels]
         else:
             # If annotation_db not given, assume that we have reward-labelled clips
@@ -59,10 +57,8 @@ class TrajectoryPreferencesDataset(Dataset):
         """
         # Load from file
         traj_path_a, traj_path_b = self.traj_path_pairs[idx]
-        with open(traj_path_a, 'rb') as f:
-            clip_a = pickle.load(f)
-        with open(traj_path_b, 'rb') as f:
-            clip_b = pickle.load(f)
+        clip_a = utils.load_clip_from_file(traj_path_a)
+        clip_b = utils.load_clip_from_file(traj_path_b)
         assert len(clip_a) == len(clip_b), (traj_path_a, traj_path_b)
 
         if self.labels is None:
@@ -71,14 +67,8 @@ class TrajectoryPreferencesDataset(Dataset):
         else:
             judgement = torch.as_tensor(self.labels[idx])
 
-        # Preprocess images
-        frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-        frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
-        vec_a = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-        frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
-        frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
-        vec_b = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-
+        frames_a, vec_a = utils.get_frames_and_vec_from_clip(clip_a)
+        frames_b, vec_b = utils.get_frames_and_vec_from_clip(clip_b)
         sample = {
             # State a
             'frames_a': frames_a,
