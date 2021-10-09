@@ -66,15 +66,20 @@ train_dqfd_args:
 sampler:
     db_path: ./output/annotation_buffer.db
     traj_dir: ./output/trajectories/
+    clips_dir: ./output/clips/
     rnd_seed: 0
-    max_traj_length: 100
-    num_traj: 5
-    num_samples: 5
+    # All clips
     sample_length: 20
-    #pair_per_sample: 2
-    autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
-    autolabel_demo_per_sample: 1
-    autolabel_early_late_demos: True
+    # Random
+    num_traj: 20
+    traj_length: 1000
+    num_random_clips_per_traj: 50 # 200 * 5 -> 1000
+    # Demos
+    num_demo_clips: 1000
+    # autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
+    # autolabel_demo_per_sample: 1
+    # autolabel_early_late_demos: False
+    # pair_per_sample: 2
 
 ###########
 # Rating
@@ -84,22 +89,26 @@ rate_ui:
     videos_dir: ./output/videos
     video_fps: 20
 
+###########
+# Reward
+###########
+
 reward:
     wandb_project: 4-train-reward
     save_dir: ./output/reward_models
     best_model_path: ./output/reward_models/best.pt
     # Training params
     rand_seed: 1
-    max_num_pairs: null
-    val_split: 0.1
+    max_num_pairs: 100000
+    val_split: 0.01
     val_every_n_batch: 100
-    save_every_n_epoch: 1
-    num_epochs: 5
+    save_every_n_batch: 500
+    num_epochs: 1
     gaussian_prior_weight: 0.1
     # The model is trained on batches of 16 segment pairs (see below), 
     # optimized with Adam (Kingma and Ba, 2014) 
     # with learning rate 0.0003, β1 = 0.9, β2 = 0.999, and eps = 10^−8 .
-    batch_size: 16
+    batch_size: 64
     adam_lr: 0.0003
     adam_betas: [0.9, 0.999]
     adam_eps: 0.00000001 # 1e-8

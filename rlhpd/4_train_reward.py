@@ -62,8 +62,11 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
-    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+    wandb.init(
+        project=cfg.reward.wandb_project, 
+        entity=cfg.wandb_entity,
+        # mode="disabled",
+    )
 
     save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -78,7 +81,7 @@ if __name__ == '__main__':
         betas=cfg.reward.adam_betas,
         eps=cfg.reward.adam_eps)
 
-    full_dataset = TrajectoryPreferencesDataset(cfg.clips.dir)
+    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.traj_dir, cfg.sampler.db_path)
     val_size = int(cfg.reward.val_split * len(full_dataset))
     train_size = len(full_dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
@@ -90,6 +93,10 @@ if __name__ == '__main__':
     for epoch in range(cfg.reward.num_epochs):
         print("Epoch", epoch)
         for batch_idx, data_batch in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
+            if samples_count > cfg.reward.max_num_pairs:
+                print(f"Hit max_num_pairs ({samples_count} / {cfg.reward.max_num_pairs}), quitting.")
+                break
+
             frames_a, frames_b, vec_a, vec_b, judgements = \
                 data_batch['frames_a'], data_batch['frames_b'], \
                 data_batch['vec_a'], data_batch['vec_b'], \
@@ -98,14 +105,15 @@ if __name__ == '__main__':
             # Run prediction pipeline
             prefer_probs, pred_rewards = pref.predict_pref_probs(
                 reward_model, frames_a, frames_b, vec_a, vec_b, ret_rewards=True)
-            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.clips.clip_length,),\
-                (pred_rewards.shape, (len(frames_a) * 2 * cfg.clips.clip_length,))
+            assert pred_rewards.shape == (len(frames_a) * 2 * cfg.sampler.sample_length,),\
+                (pred_rewards.shape, (len(frames_a) * 2 * cfg.sampler.sample_length,))
 
             # Calculate loss:
             # This is almost CrossEntropy but slightly different because we want to support
             # tie condition (0.5, 0.5) in judgement which is not possible in default XEnt
             # loss = - (judgement[0] * torch.log(prefer_1) + judgement[1] * torch.log(prefer_2))
-            assert judgements.shape == prefer_probs.shape
+            assert judgements.shape == prefer_probs.shape,\
+                (judgements.shape, prefer_probs.shape)
             loss = - torch.sum(judgements * torch.log(prefer_probs))
             # An extra loss proportional to the square of the predicted rewards is added 
             # to impose a zero-mean Gaussian prior on the reward distribution.
@@ -131,11 +139,11 @@ if __name__ == '__main__':
             
             samples_count += len(frames_a)
 
-        # Save model
-        if epoch % cfg.reward.save_every_n_epoch == 0:
-            save_path = save_dir / f"{samples_count:06d}.pt"
-            torch.save(reward_model.state_dict(), save_path)
-            print("Saved model to", save_path)
+            # Save model
+            if batch_idx % cfg.reward.save_every_n_batch == 0:
+                save_path = save_dir / f"{samples_count:06d}.pt"
+                torch.save(reward_model.state_dict(), save_path)
+                print("Saved model to", save_path)
 
         # TODO: A fraction of 1/e of the data is held out to be used as a validation set. 
         # We use L2- regularization of network weights with the adaptive scheme described in 

@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from . import preference_helpers as pref
+from . import utils
 from .database import AnnotationBuffer
 
 class TrajectoryPreferencesDataset(Dataset):
@@ -30,11 +31,8 @@ class TrajectoryPreferencesDataset(Dataset):
 
         if annotation_db_path is not None:
             db = AnnotationBuffer(annotation_db_path)
-            id_pairs, labels = db.get_all_rated_pairs_with_labels()
-            path_pairs = [
-                ((self.data_dir / l).with_suffix('.pickle'), (self.data_dir / r).with_suffix('.pickle')) 
-                for l, r in id_pairs]
-            self.labels = labels
+            path_pairs, labels = db.get_all_rated_pairs_with_labels()
+            self.labels = [db.label_to_judgement(l) for l in labels]
         else:
             # If annotation_db not given, assume that we have reward-labelled clips
             # so we can just load any pair of clips and simulate the judgement ourselves
@@ -55,29 +53,40 @@ class TrajectoryPreferencesDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        Loads a batch of data
+        Loads a single sample of data
         """
         # Load from file
         traj_path_a, traj_path_b = self.traj_path_pairs[idx]
-        with open(traj_path_a, 'rb') as f:
-            clip_a = pickle.load(f)
-        with open(traj_path_b, 'rb') as f:
-            clip_b = pickle.load(f)
-        assert len(clip_a) == len(clip_b)
+        clip_a = utils.load_clip_from_file(traj_path_a)
+        clip_b = utils.load_clip_from_file(traj_path_b)
+        assert len(clip_a) == len(clip_b), (traj_path_a, traj_path_b)
 
         if self.labels is None:
             # Compute judgement based on rewards
             judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
         else:
-            judgement = torch.as_tensor(self.labels)
+            judgement = torch.as_tensor(self.labels[idx])
 
-        # Preprocess images
-        frames_a = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-        frames_a = einops.rearrange(frames_a, 't h w c -> t c h w') / 255
-        vec_a = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
-        frames_b = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_b], axis=0)
-        frames_b = einops.rearrange(frames_b, 't h w c -> t c h w') / 255
-        vec_b = torch.stack([torch.as_tensor(state['vector'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip_a], axis=0)
+        frames_a, vec_a = utils.get_frames_and_vec_from_clip(clip_a)
+        frames_b, vec_b = utils.get_frames_and_vec_from_clip(clip_b)
+        # vec_a[:] = 0
+        # vec_b[:] = 0
+        # frames_a[:] = 0
+        # frames_b[:] = 0
+        # print(vec_a)
+        # print(vec_b)
+        # print(frames_a)
+        # print(frames_b)
+
+        # We need to occasionally swap the positions of A and B clips because
+        # autolabeling always puts the better clip on the left, so without this
+        # swapping, the model will learn to simply "always predict left"
+        # Edit: This should not in fact be true since the model doesn't receive
+        # but only single images without context, but will leave this in until we
+        # verify what the actual problem is
+        if idx % 2 == 0:
+            frames_a, vec_a, frames_b, vec_b = frames_b, vec_b, frames_a, vec_a
+            judgement = torch.tensor([1,1]) - judgement
 
         sample = {
             # State a

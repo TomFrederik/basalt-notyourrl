@@ -1,7 +1,10 @@
+import pickle
 import random
 
+import einops
 import munch
 import numpy as np
+import skvideo.io
 import torch
 import yaml
 
@@ -16,3 +19,28 @@ def load_config(config_path: str) -> munch.Munch:
         cfg_dict = yaml.safe_load(f)
         cfg = munch.munchify(cfg_dict)
     return cfg
+
+def load_clip_from_file(filepath):
+    with open(filepath, 'rb') as f:
+        clip = pickle.load(f)
+    return clip
+
+def get_frames_and_vec_from_clip(clip: list):
+    """
+    clip: list of tuples (state, action, reward, next_state, done, meta)
+    """
+    frames = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip], axis=0)
+    frames = einops.rearrange(frames, 't h w c -> t c h w') / 255
+    vec = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip], axis=0)
+    return frames, vec
+
+def save_vid(imgs, video_path, fps):
+    assert len(imgs) > 0
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    with skvideo.io.FFmpegWriter(
+        video_path, 
+        inputdict={'-r': str(fps)},
+        outputdict={'-r': str(fps), '-vcodec': 'libx264'},
+        ) as writer:
+        for idx in range(imgs.shape[0]):
+            writer.writeFrame(imgs[idx])
