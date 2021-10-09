@@ -62,8 +62,11 @@ if __name__ == '__main__':
     # Params
     cfg = utils.load_config(options.config_file)
 
-    wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity)
-    # wandb.init(project=cfg.reward.wandb_project, entity=cfg.wandb_entity, mode="disabled")
+    wandb.init(
+        project=cfg.reward.wandb_project, 
+        entity=cfg.wandb_entity,
+        # mode="disabled",
+    )
 
     save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)

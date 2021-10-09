@@ -50,6 +50,13 @@ class App:
 
             if st.button("Show me another labelled pair"):
                 left_id, right_id, pref = self.db.get_random_rated_tuple()
+                # Randomly swap images to avoid having some systematic bias to right or left
+                if np.random.randint(2) == 0:
+                    left_id, right_id = right_id, left_id
+                    if pref == 1:
+                        pref = 2
+                    elif pref == 2:
+                        pref = 1
 
         left, right = st.columns(2)
 

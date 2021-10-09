@@ -69,6 +69,17 @@ class TrajectoryPreferencesDataset(Dataset):
 
         frames_a, vec_a = utils.get_frames_and_vec_from_clip(clip_a)
         frames_b, vec_b = utils.get_frames_and_vec_from_clip(clip_b)
+
+        # We need to occasionally swap the positions of A and B clips because
+        # autolabeling always puts the better clip on the left, so without this
+        # swapping, the model will learn to simply "always predict left"
+        # Edit: This should not in fact be true since the model doesn't receive
+        # but only single images without context, but will leave this in until we
+        # verify what the actual problem is
+        if idx % 2 == 0:
+            frames_a, vec_a, frames_b, vec_b = frames_b, vec_b, frames_a, vec_a
+            judgement = torch.tensor([1,1]) - judgement
+
         sample = {
             # State a
             'frames_a': frames_a,
