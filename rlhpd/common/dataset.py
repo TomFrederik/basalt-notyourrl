@@ -69,6 +69,14 @@ class TrajectoryPreferencesDataset(Dataset):
 
         frames_a, vec_a = utils.get_frames_and_vec_from_clip(clip_a)
         frames_b, vec_b = utils.get_frames_and_vec_from_clip(clip_b)
+        # vec_a[:] = 0
+        # vec_b[:] = 0
+        # frames_a[:] = 0
+        # frames_b[:] = 0
+        # print(vec_a)
+        # print(vec_b)
+        # print(frames_a)
+        # print(frames_b)
 
         # We need to occasionally swap the positions of A and B clips because
         # autolabeling always puts the better clip on the left, so without this
