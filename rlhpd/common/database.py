@@ -7,6 +7,9 @@ from typing import List, Tuple
 class NoUnratedPair(Exception):
     """No unrated pair found in the database"""
     pass
+class NoRatedPair(Exception):
+    """No rated pair found in the database"""
+    pass
 
 class AnnotationBuffer:
     def __init__(self, db_path) -> None:
@@ -30,14 +33,36 @@ class AnnotationBuffer:
                     unique (left_id, right_id)
                 ) ''')
 
-    def insert_traj_pair(self, left_id:str, right_id:str): 
-        """ Insert a pair of IDs that is yet to rate"""
+    def insert_many_traj_tuples(self, traj_tuples):
+        """
+        traj_tuples is a list of tuples (left_id, right_id, pref)
+        This is more efficient than its counterpart `insert_traj_pair`
+        """
+        # Data validation
+        for i, (left_id, right_id, pref) in enumerate(traj_tuples):
+            if left_id == right_id:
+                raise Exception("The supplied IDs are the same")
+            if left_id > right_id:
+                traj_tuples[i][0], traj_tuples[i][1] = right_id, left_id
+                if pref == 1:
+                    traj_tuples[i][2] = 2
+                elif pref == 2:
+                    traj_tuples[i][2] = 1
+        self.c.executemany(''' INSERT INTO trajectories (left_id, right_id, preference) VALUES(?, ?, ?) ''', traj_tuples)
+        self.conn.commit()
+
+    def insert_traj_pair(self, left_id:str, right_id:str, pref=0): 
+        """ Insert a pair of IDs, optionally with a rating"""
         if left_id == right_id:
             raise Exception("The supplied IDs are the same")
         if left_id > right_id:
             left_id, right_id = right_id, left_id
+            if pref == 1:
+                pref = 2
+            elif pref == 2:
+                pref = 1
         # sqlite3.IntegrityError occurs if they already exist
-        self.c.execute(''' INSERT INTO trajectories (left_id, right_id, preference) VALUES(?, ?, ?) ''', (left_id, right_id, 0)) 
+        self.c.execute(''' INSERT INTO trajectories (left_id, right_id, preference) VALUES(?, ?, ?) ''', (left_id, right_id, pref)) 
         self.conn.commit()
 
     def rate_traj_pair(self, left_id, right_id, preference): 
@@ -92,13 +117,13 @@ class AnnotationBuffer:
             raise NoUnratedPair
         return (unrated_pairs[0][0], unrated_pairs[0][1])
 
-    def get_random_rated_pair(self) -> Tuple[str]:
-        self.c.execute('''SELECT * FROM trajectories WHERE preference = 2''') 
-        rated_pairs = self.c.fetchall()
-        if len(rated_pairs)==0:
-            raise NoUnratedPair
-        pair = random.choice(rated_pairs)
-        return (pair[0], pair[1])
+    def get_random_rated_tuple(self) -> Tuple[str]:
+        self.c.execute('''SELECT * FROM trajectories WHERE preference = 1 OR preference = 2''') 
+        rated_tuples = self.c.fetchall()
+        if len(rated_tuples)==0:
+            raise NoRatedPair
+        rated_tuple = random.choice(rated_tuples)
+        return rated_tuple
 
     def get_rating_of_pair(self, left_id, right_id) -> int:
         """0 for unrated, 1 for left, 2 for right, 3 for equally good, 4 for undecided"""

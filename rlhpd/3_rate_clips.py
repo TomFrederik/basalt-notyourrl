@@ -34,7 +34,6 @@ class App:
         st.title("Human preferences user interface")
 
         # TODO: Cache so Streamlit doesn't run it on every refresh
-        self.npy_dir = Path(traj_dir)
         self.videos_dir = Path(videos_dir)
         self.db = database.AnnotationBuffer(db_path)
         self.video_fps = video_fps
@@ -67,28 +66,32 @@ class App:
         # videos will names as ids, same as in table
         # do pre-populated database in previous step that doesn't have the choices yet
         # load the pair vids from the database
-        left_id, right_id = self.db.get_random_rated_pair()
+        left_id, right_id, pref = self.db.get_random_rated_tuple()
 
         with left:
-            st.write(f"Video ID: `{left_id}`")
+            st.write(f"`{left_id}`")
             vid_path = self.videos_dir / "left.mp4"
-            save_vid(self.npy_dir / f"{left_id}.pickle", vid_path, self.video_fps)
+            save_vid(left_id, vid_path, self.video_fps)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
+            if pref == 1:
+                st.success("THIS IS BETTER")
 
         with right:
-            st.write(f"Video ID: `{right_id}`")
+            st.write(f"`{right_id}`")
             vid_path = self.videos_dir / "right.mp4"
-            save_vid(self.npy_dir / f"{right_id}.pickle", vid_path, self.video_fps)
+            save_vid(right_id, vid_path, self.video_fps)
             video_file = open(vid_path, 'rb')
             video_bytes = video_file.read()
             st.video(video_bytes)
+            if pref == 2:
+                st.success("THIS IS BETTER")
 
         with just_browsing:
             browse_labelled = st.button("I want to see a labelled pair")
             if browse_labelled:
-                left_id, right_id = self.db.get_random_rated_pair()
+                left_id, right_id, pref = self.db.get_random_rated_tuple()
         with left:
             choose_left = st.button(
                 'The left one is better', key = "left")

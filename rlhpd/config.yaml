@@ -66,15 +66,20 @@ train_dqfd_args:
 sampler:
     db_path: ./output/annotation_buffer.db
     traj_dir: ./output/trajectories/
+    clips_dir: ./output/clips/
     rnd_seed: 0
-    max_traj_length: 100
-    num_traj: 5
-    num_samples: 5
+    # All clips
     sample_length: 20
-    #pair_per_sample: 2
-    autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
-    autolabel_demo_per_sample: 1
-    autolabel_early_late_demos: False
+    # Random
+    num_traj: 20
+    traj_length: 1000
+    num_random_clips_per_traj: 50 # 200 * 5 -> 1000
+    # Demos
+    num_demo_clips: 1000
+    # autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
+    # autolabel_demo_per_sample: 1
+    # autolabel_early_late_demos: False
+    # pair_per_sample: 2
 
 ###########
 # Rating
