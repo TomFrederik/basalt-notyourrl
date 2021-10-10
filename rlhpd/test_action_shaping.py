@@ -8,15 +8,16 @@ from common.state_shaping import StateWrapper
 env_name = 'MineRLBasaltFindCave-v0'
 env = gym.make(env_name)
 env = StateWrapper(env)
-env = RewardActionWrapper(env_name, env, DummyRewardModel())
 # forward
+print('\nForward:')
 action = env.action_space.sample()
-action_final, index = action_shaping_complex(action, env_name)
+action['equip'] = 'snowball'
 print(f'{action = }')
+action_final, index = action_shaping_complex(action, env_name)
 print(f'{action_final = }')
-print(f'{index = }')
+env = RewardActionWrapper(env_name, env, DummyRewardModel())
 
 # backward
+print('\nBackward:')
 action = reverse_action_shaping_complex(index, env_name)
 print(f'{action = }')
-env.step(action)

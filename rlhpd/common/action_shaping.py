@@ -340,7 +340,6 @@ def reverse_action_shaping_complex(index, env_name):
     all_options = list(itertools.product(*map(lambda x: x+['none'], groups)))
     
     active_action_keys = all_options[index]
-    
     action_dict = OrderedDict([
         ("attack",np.array(0)),
         ("back",np.array(0)),
