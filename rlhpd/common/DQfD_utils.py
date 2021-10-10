@@ -11,9 +11,7 @@ from torch.utils.data import Dataset
 import minerl
 import gym
 
-from .action_shaping import find_cave_action, make_waterfall_action, build_house_action,\
-    create_pen_action, reverse_find_cave_action_simple, reverse_make_waterfall_action_simple, \
-    reverse_build_house_action, reverse_create_pen_action
+from .action_shaping import action_shaping_complex, reverse_action_shaping_complex
 from .state_shaping import preprocess_state
 
 Transition = namedtuple('Transition',
@@ -267,11 +265,7 @@ class RewardActionWrapper(gym.Wrapper):
 
     def step(self, action):
         # translate action to proper action dict
-        new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action_simple,
-            'MineRLBasaltMakeWaterfall-v0':reverse_make_waterfall_action_simple,
-            'MineRLBasaltCreateVillageAnimalPen-v0':reverse_create_pen_action,
-            'MineRLBasaltBuildVillageHouse-v0':reverse_build_house_action
-        }[self.env_name](action)
+        new_action = reverse_action_shaping_complex(action, self.env_name)
 
         next_state, reward, done, info = self.env.step(new_action)
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
