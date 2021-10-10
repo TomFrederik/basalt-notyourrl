@@ -166,5 +166,9 @@ if __name__ == '__main__':
         # See https://github.com/mrahtz/learning-from-human-preferences/blob/master/reward_predictor.py#L167-L169
 
     # Save final model
+    save_path = save_dir / f"{samples_count:06d}.pt"
+    torch.save(reward_model.state_dict(), save_path)
+    print("Saved model to", save_path)
+    # Also save final model to the "best" path
     torch.save(reward_model.state_dict(), cfg.reward.best_model_path)
     print("Saved model to", save_path)
