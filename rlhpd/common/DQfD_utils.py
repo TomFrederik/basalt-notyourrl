@@ -1,6 +1,7 @@
 import random
 from collections import deque, namedtuple
 from copy import deepcopy
+from functools import partial
 
 import einops
 import numpy as np
@@ -147,12 +148,7 @@ class MemoryDataset(Dataset):
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
         self.env_name = env_name
-        action_fn = {
-            'MineRLBasaltFindCave-v0':find_cave_action,
-            'MineRLBasaltMakeWaterfall-v0':make_waterfall_action,
-            'MineRLBasaltCreateVillageAnimalPen-v0':create_pen_action,
-            'MineRLBasaltBuildVillageHouse-v0':build_house_action
-        }[self.env_name]
+        action_fn = partial(action_shaping_complex, env_name)
         self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
         
