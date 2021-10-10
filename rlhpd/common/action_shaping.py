@@ -1,4 +1,6 @@
 from collections import OrderedDict
+from copy import deepcopy
+import itertools
 
 import numpy as np
 import gym
@@ -259,6 +261,74 @@ def find_cave_action_simple(action):
         action_final_prioritized, 6)  # 6 is index for "move forward"
 
     return action_final_prioritized_indexed, index
+
+def our_function(action_final):
+    '''
+    action final = OrderedDict({'forward': 0/1, ...})
+    {forward, back, none} X {left, right, none} X {jump, none} X {attack, none} X {camera_left, camera_right, camera_up, camera_down, none} X {all_equip_options, none} X {use, none}
+    3 * 3 * 2 * 2 * 5 * (N+1) * 2 = 360 * (N+1)
+    '''
+    straight_movements = ['forward', 'back']
+    lateral_movements = ['left', 'right']
+    jump = ['jump']
+    attack = ['attack']
+    camera = ['camera_left', 'camera_right', 'camera_up', 'camera_down']
+    equip = [key for key in action_final.keys() if key.startswith('equip')]
+    use = ['use']
+    groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
+
+    new_action_final = deepcopy(action_final)
+
+    key_tuple = []
+    for group in groups:
+        found = False
+        for key in group:
+            if action_final[key]:
+                new_action_final[key] = 1
+                key_tuple.append(key)
+                found = True
+                break
+            else:
+                new_action_final[key] = 0
+        if not found:
+            key_tuple.append('none')
+    key_tuple = tuple(key_tuple)
+
+    all_options = list(itertools.product(*map(lambda x: x+['none'], groups)))
+    print(f'{len(all_options)=}')
+    index = all_options.index(key_tuple)
+
+    return new_action_final, index
+    
+    
+
+def action_shaping_complex(action, env_name):
+    # action['camera']=[float, float] ----> action['camera_down']= {0,1}, action['camera_left']= {0,1} , etc.
+    cam_actions_shaped = get_cam_actions_shaped(*action['camera'],
+                                                PITCH_MARGIN, YAW_MARGIN,
+                                                action['left'], action['right'])
+
+    # insert shaped camera actions
+    action_withcam = insert_actions(
+        action, cam_actions_shaped, 'back')
+
+    # add equip action shaping
+    equip_actions = shape_equip(action_withcam, INVENTORY[env_name])
+    action_withcam_equipped = insert_actions(
+        action_withcam, equip_actions, 'forward'
+    )
+
+    # remove actions that are not needed
+    action_final = remove_actions(
+        action_withcam_equipped,
+        ['camera', 'equip', 'sprint', 'sneak'])
+    
+    #
+    action_final, index = our_function(action_final)
+
+    return action_final, index
+
+
 
 
 
