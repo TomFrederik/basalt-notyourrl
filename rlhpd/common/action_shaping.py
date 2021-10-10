@@ -295,7 +295,6 @@ def our_function(action_final):
     key_tuple = tuple(key_tuple)
 
     all_options = list(itertools.product(*map(lambda x: x+['none'], groups)))
-    print(f'{len(all_options)=}')
     index = all_options.index(key_tuple)
 
     return new_action_final, index
@@ -328,8 +327,48 @@ def action_shaping_complex(action, env_name):
 
     return action_final, index
 
+def reverse_action_shaping_complex(index, env_name):
+    straight_movements = ['forward', 'back']
+    lateral_movements = ['left', 'right']
+    jump = ['jump']
+    attack = ['attack']
+    camera = ['camera_left', 'camera_right', 'camera_up', 'camera_down']
+    equip = [key for key in ['equip_' + item for item in INVENTORY[env_name]]]
+    use = ['use']
+    groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
 
+    all_options = list(itertools.product(*map(lambda x: x+['none'], groups)))
+    
+    active_action_keys = all_options[index]
+    action_dict = OrderedDict([
+        ("attack",np.array(0)),
+        ("back",np.array(0)),
+        ("camera",np.array([0,0])),
+        ("equip",'none'),
+        ("forward",np.array(0)),
+        ("jump",np.array(0)),
+        ("left",np.array(0)),
+        ("right",np.array(0)),
+        ("sneak",np.array(0)),
+        ("sprint",np.array(0)),
+        ("use",np.array(0))
+    ])
 
+    for key in active_action_keys:
+        if key.startswith('equip_'):
+            action_dict['equip'] = key[6:]
+        elif key.startswith('camera'):
+            action_dict['camera'] = CAMERA_STR_TO_ARRAY[key]
+        else:
+            action_dict[key] = np.array(1)
+    return action_dict
+
+CAMERA_STR_TO_ARRAY = {
+    'camera_left': np.array([0, -YAW_MARGIN]).astype(np.float32),
+    'camera_right': np.array([0, YAW_MARGIN]).astype(np.float32),
+    'camera_up': np.array([PITCH_MARGIN, 0]).astype(np.float32),
+    'camera_down': np.array([-PITCH_MARGIN, 0]).astype(np.float32)
+}
 
 
 def make_waterfall_action_simple(action):
