@@ -45,16 +45,24 @@ def preprocess_state(state):
     # Append a new flattened 'vec' attribute to the state; 'vec' contains the same info
     # as state['equipped_items'] and state['inventory'], we leave those in only for
     # debugging purposes (they will not be used by the agent)
-    state['vec'] = preprocess_non_pov_obs(state)
-    return state
+    new_state = {}
+    new_state['vec'] = preprocess_non_pov_obs(state)
+    new_state['pov'] = preprocess_pov_obs(state)
+    return new_state
 
 class StateWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.env = env
+        dummy_vec = preprocess_non_pov_obs(self.observation_space.sample())
+        self.observation_space = gym.spaces.Dict({
+            'pov':gym.spaces.Box(0, 1, (3,64,64)), 
+            'vec':gym.spaces.Box(-np.inf, np.inf, dummy_vec.shape)
+        })
         
     def observation(self, obs):
-        return preprocess_state(obs)
+        obs = preprocess_state(obs)
+        return obs
 
 if __name__ == "__main__":
     # Run test

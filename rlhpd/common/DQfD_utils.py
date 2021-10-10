@@ -266,8 +266,8 @@ class RewardActionWrapper(gym.Wrapper):
         self.env = env
         self.env_name = env_name
         self.reward_model = reward_model
-        self.env.action_space = gym.spaces.Discrete(11)
-    
+        self.action_space = gym.spaces.Discrete(11)
+
     def step(self, action):
         # translate action to proper action dict
         new_action = {'MineRLBasaltFindCave-v0':reverse_find_cave_action_simple,
@@ -277,7 +277,6 @@ class RewardActionWrapper(gym.Wrapper):
         }[self.env_name](action)
 
         next_state, reward, done, info = self.env.step(new_action)
-
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
         reward = reward.detach().cpu().numpy()
         

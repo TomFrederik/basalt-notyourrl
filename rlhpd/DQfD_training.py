@@ -24,90 +24,7 @@ class DummyRewardModel(nn.Module):
         
     def forward(self, obs, vec):
         return torch.zeros_like(vec)[:,0]
-
-'''
-def collect_episode(
-    env,
-    q_net,
-    discount_factor,
-    total_env_steps,
-    max_env_steps,
-    max_episode_len
-):
-    
-    while total_env_steps < max_env_steps:
-        obs_list = []
-        action_list = []
-        rew_list = []
-        td_error_list = []
         
-        num_episodes += 1
-        print(f'\nStarting episode {num_episodes}...')
-
-        # re-init env
-        done = False
-        time1 = time()
-        obs = env.reset()
-        obs_list.append(obs)
-        print(f'Resetting the environment took {time()-time1}s')
-        
-        steps = 0
-        total_reward = 0
-        
-        # prepare input
-        obs_pov = torch.from_numpy(einops.rearrange(obs['pov'], 'h w c -> 1 c h w').astype(np.float32) / 255).to(q_net.device)
-        obs_vec = torch.from_numpy(einops.rearrange(obs['vector'], 'd -> 1 d').astype(np.float32)).to(q_net.device)
-
-        # go to eval mode
-        q_net.eval()
-        
-        with torch.no_grad():
-
-            q_values = q_net(obs_pov, obs_vec)[0].squeeze()
-            
-            while not done:    
-                
-                # select new action
-                if steps % action_repeat == 0:
-                    if np.random.rand(1)[0] < epsilon:
-                        action_ind = np.random.randint(centroids.shape[0])
-                        highest_q = q_values[action_ind].cpu().item()
-                    else:
-                        action_ind = torch.argmax(q_values, dim=0).cpu().item()
-                        highest_q = q_values[action_ind].cpu().item()
-
-                    # remap action to centroid
-                    action = {'vector': centroids[action_ind]}
-                
-                # env step
-                obs, rew, done, _ = env.step(action)
-                
-                # store transition
-                obs_list.append(obs)
-                rew_list.append(rew)
-                action_list.append(action_ind)
-                
-                # prepare input
-                obs_pov = torch.from_numpy(einops.rearrange(obs['pov'], 'h w c -> 1 c h w').astype(np.float32) / 255).to(q_net.device)
-                obs_vec = torch.from_numpy(einops.rearrange(obs['vector'], 'd -> 1 d').astype(np.float32)).to(q_net.device)
-                
-                # compute q values
-                q_values = q_net(obs_pov, obs_vec)[0].squeeze()
-                predictive_state_list.append(predictive_state_list[-1]) # add another zero array to the list
-
-                # record td_error
-                td_error_list.append(np.abs(rew + discount_factor * q_net(obs_pov, obs_vec, target=True)[0].squeeze()[torch.argmax(q_values)].cpu().item() - highest_q))
-                
-                # bookkeeping
-                total_reward += rew
-                steps += 1
-                total_env_steps += 1
-                if steps >= max_episode_len or total_env_steps == max_env_steps:
-                    break
-
-        print(f'\nEpisode {num_episodes}: Total reward: {total_reward}, Duration: {time()-time0}s')
-        wandb.log({'Training/Episode Reward': total_reward})
-'''
 def train(
     log_dir, 
     new_model_path,
@@ -134,8 +51,7 @@ def train(
     
     # init env
     env = gym.make(env_name)
-    env = StateWrapper(env)
-    env = RewardActionWrapper(env_name, env, reward_model)
+    env = RewardActionWrapper(env_name, StateWrapper(env), reward_model)
     obs = env.reset()
     done = False
     
@@ -260,6 +176,9 @@ def train(
             if steps % update_freq == 0:
                 print('Updating target model...')
                 target_q_net = deepcopy(q_net)
+
+            steps += 1
+
         print(f'\nEpisode ended! Estimated reward: {estimated_episode_reward}\n')        
         wandb.log({'Training/Estimated Episode Reward': estimated_episode_reward})
 
@@ -278,12 +197,13 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
     os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(new_model_path), exist_ok=True)
     
     # set device # TODO: use cuda?
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     # load q_net
-    q_net = torch.load(model_path)
+    q_net = torch.load(model_path).to(device)
 
     # load reward model
     if reward_model_path is None:
@@ -322,8 +242,8 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
         weight_decay,
         update_freq,
         epsilon
-    ).to(device)
-    
+    )
+
     print('Training finished! Saving model...')
     torch.save(q_net, new_model_path)
 
@@ -356,3 +276,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     main(**vars(args))
+
+
+
+
+
