@@ -8,9 +8,11 @@ import einops
 import numpy as np
 import cv2
 
+import minerl
 from common.DQfD_models import QNetwork
-from common.DQfD_utils import preprocess_non_pov_obs
-from common.action_shaping import ActionWrapper
+from common.state_shaping import preprocess_non_pov_obs, StateWrapper
+from common.DQfD_utils import RewardActionWrapper, DummyRewardModel
+
 
 def main(
     env_name,
@@ -29,7 +31,8 @@ def main(
 
     # init env
     env = gym.make(env_name)
-    env = ActionWrapper(env, env_name)
+    env = StateWrapper(env)
+    env = RewardActionWrapper(env_name, env, DummyRewardModel())
 
     for i in range(num_episodes):
         print(f'\nStarting episode {i+1}')
@@ -41,16 +44,14 @@ def main(
 
         while not done:
             # save pov obs for video creation
-            pov_list.append(obs['pov'])
+            pov_list.append((einops.rearrange(obs['pov'], 'c h w -> h w c') * 255).astype(np.uint8))
 
             # extract pov and inv from obs and convert to torch tensors
-            pov = einops.rearrange(obs['pov'], 'h w c -> 1 c h w').astype(np.float32) / 255
-            inv = einops.rearrange(preprocess_non_pov_obs(obs), 'd -> 1 d')
-            pov = torch.from_numpy(np.array(pov))
-            inv = torch.from_numpy(np.array(inv))
+            pov = torch.from_numpy(obs['pov'][None])
+            vec = torch.from_numpy(obs['vec'][None])
 
             # compute q_values
-            q_values = q_net.forward(dict(pov=pov, inv=inv))
+            q_values = q_net.forward(pov, vec)
 
             # select action
             if random.random() < epsilon:
