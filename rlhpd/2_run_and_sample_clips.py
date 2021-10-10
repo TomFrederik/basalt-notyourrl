@@ -7,6 +7,7 @@ Add clips (unannotated) into annotation db
 
 import argparse
 import contextlib
+import itertools
 import os
 import pickle
 import random
@@ -44,6 +45,7 @@ class DataBaseFiller:
         self.db = database.AnnotationBuffer(self.db_path)
         # All clips
         self.sample_length = cfg.sampler.sample_length
+        self.max_pairs_per_autolabel_type = cfg.sampler.max_pairs_per_autolabel_type
         self.traj_dir = Path(cfg.sampler.traj_dir)
         self.traj_dir.mkdir(parents=True, exist_ok=True)
         self.clips_dir = Path(cfg.sampler.clips_dir)
@@ -148,38 +150,31 @@ class DataBaseFiller:
             # Take note of the clip position within the trajectory; this is useful for
             # autolabelling early/late portions of the trajectory
             normalized_idx = start_idx / (len(traj_frames) - self.sample_length)
-            percentile = int(10 * np.floor(100 * normalized_idx / 10))
-            demo_path = clips_dir / f"demo_{i:03d}_{random_traj}_{percentile:03d}.pickle"
+            percent = 100 * normalized_idx
+            demo_path = clips_dir / f"demo_{i:03d}_{random_traj}_{percent:03d}.pickle"
             self._write_to_file(demo_path, clip)
 
-    def _do_autolabels(self):
-        """ Pairs each newly generated sample with a random sample from the demonstrations"""
-        for x in range(self.num_traj):
-            for y in range(self.num_samples):
-                for _ in range(self.autolabel_demo_num):
-                    # get a random demo sample
-                    demo_sample, end_clip = self._get_demo_sample()
-                    demo_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}.pickle"
-                    # save it to a file
-                    self._write_to_file(demo_path,demo_sample)
-                    if self.autolabel_early_late_demos:
-                        end_path = self.traj_dir / f"demo_{self.run_id}_traj_{x}_smpl_{y}_end.pickle"
-                        self._write_to_file(end_path,end_clip)
-                    try: # if we picked a pair that exists we just skip
-                        # write it to database and rate better
-                        self.db.insert_traj_pair(
-                            f"{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}")
-                        self.db.rate_traj_pair(
-                            f"{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}", 2)
-                        if self.autolabel_early_late_demos:
-                            self.db.insert_traj_pair(
-                            f"demo_{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}_end")
-                            self.db.rate_traj_pair(
-                            f"demo_{self.run_id}_traj_{x}_smpl_{y}", f"demo_{self.run_id}_traj_{x}_smpl_{y}_end", 2)
-                    except:
-                        continue
+    def _insert_all_pairs_into_db(self, good_paths, bad_paths, shuffle=True, max_pairs=None):
+        # Generate all possible pairs
+        all_pairs = list(itertools.product(good_paths, bad_paths))
+        if shuffle:
+            random.shuffle(all_pairs)
+        if max_pairs is not None:
+            # Limit the number of pairs
+            all_pairs = all_pairs[:max_pairs]
+        
+        # Insert tuples in batches
+        batch_of_traj_tuples = []
+        for good_path, bad_path in tqdm(all_pairs):
+            batch_of_traj_tuples.append([str(good_path), str(bad_path), 1])
+            if len(batch_of_traj_tuples) == 1000:
+                self.db.insert_many_traj_tuples(batch_of_traj_tuples)
+                batch_of_traj_tuples = []
+        # Insert any remainders
+        self.db.insert_many_traj_tuples(batch_of_traj_tuples)
+        return
 
-    def _populate_db_autolabel_simple(self, good_dir: Path, bad_dir: Path):
+    def _populate_db_autolabel_simple(self, good_dir: Path, bad_dir: Path, max_pairs=None):
         """
         Creates auto-labeled entries of preference pairs in the database,
         by pairing up random pairs of (bad_dir_sample, good_dir_sample).
@@ -187,22 +182,56 @@ class DataBaseFiller:
         """
         good_paths = sorted([x for x in good_dir.glob("*.pickle")])
         bad_paths = sorted([x for x in bad_dir.glob("*.pickle")])
-        for good_path in tqdm(good_paths):
-            batch_of_traj_tuples = []
-            for bad_path in bad_paths:
-                batch_of_traj_tuples.append((str(good_path), str(bad_path), 1))
-            self.db.insert_many_traj_tuples(batch_of_traj_tuples)
+        self._insert_all_pairs_into_db(good_paths, bad_paths, shuffle=True, max_pairs=max_pairs)
         return
-        
+
+    def _populate_db_autolabel_custom(self, clips_dir: Path, is_good, is_bad, max_pairs=None):
+        """
+        Creates auto-labeled entries of preference pairs in the database, by
+        evaluating the given boolean functions `is_good` or `is_bad` on all clips
+        inside clips_dir and populating the DB with every possible pairing of 
+        (good, bad) samples.
+        """
+        all_paths = sorted([x for x in clips_dir.glob("*.pickle")])
+        good_paths = []
+        bad_paths = []
+        # First sort paths into good, bad, or none
+        for path in all_paths:
+            if is_good(path):
+                good_paths.append(path)
+            elif is_bad(path):
+                bad_paths.append(path)
+        # Populate DB with every possible pairing of (good, bad)
+        self._insert_all_pairs_into_db(good_paths, bad_paths, shuffle=True, max_pairs=max_pairs)
+        return 
+
+    def _populate_db_autolabel_early_late(self, clips_dir, max_pairs=None):
+        """
+        Clips that start earlier than 30% of the full trajectory are labelled as "worse"
+        than clips that start later than 70% of the full trajectory. This implementation
+        allows clips to be compared across different trajectories.
+        """
+
+        def is_early_clip(clip_path):
+            position_percent = int(Path(clip_path).stem.split("_")[-1])
+            if position_percent < 30:
+                return True
+            return False
+
+        def is_late_clip(clip_path):
+            position_percent = int(Path(clip_path).stem.split("_")[-1])
+            if position_percent >= 70:
+                return True
+            return False
+
+        return self._populate_db_autolabel_custom(
+            clips_dir,
+            is_good = is_late_clip,
+            is_bad = is_early_clip,
+            max_pairs = max_pairs,
+        )
+
     def run(self):
-        # print("Generating clips from policy...")
-        # self._save_all_traj_and_samples()
-        # #print("Adding clips to database...")
-        # #self._fill_database_from_files()
-        # if self.autolabel_with_demos:
-        #     print("Adding autolabelled clips from demonstrations...")
-        #     self._do_autolabels()
-        
         random_clips_dir = self.clips_dir / "random"
         demo_clips_dir = self.clips_dir / "demos"
 
@@ -217,18 +246,11 @@ class DataBaseFiller:
         print("Running autolabeling...")
 
         # Random < any demos
-        self._populate_db_autolabel_simple(
-            good_dir = demo_clips_dir,
-            bad_dir = random_clips_dir,
-        )
-
-        # def is_early_clip(clipname):
-        #     clipname.
-        # populate_db_autolabel_with_lambdas(
-        #     demo_clips_dir,
-        #     is_worse = (lambda filename : filename.starts_with()), # 
-        #     is_better,
-        # )
+        self._populate_db_autolabel_simple(good_dir = demo_clips_dir,
+                                           bad_dir = random_clips_dir,
+                                           max_pairs=self.max_pairs_per_autolabel_type)
+        # Early < Late
+        self._populate_db_autolabel_early_late(demo_clips_dir, max_pairs=self.max_pairs_per_autolabel_type)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sample clips from pretrained model')
