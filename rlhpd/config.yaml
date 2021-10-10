@@ -39,10 +39,10 @@ dqfd_args:
     weight_decay: 0.00001
     supervised_loss_margin: 0.8
     discount_factor: 0.99
-    pretrain_steps: 100000
 
 # args that are special to pretraining
 pretrain_dqfd_args:
+    pretrain_steps: 10000
     model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
     n_hid: 64
     vec_feature_dim: 128

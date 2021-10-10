@@ -5,6 +5,7 @@ from copy import deepcopy
 import einops
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset
 import minerl
 import gym
@@ -281,3 +282,11 @@ class RewardActionWrapper(gym.Wrapper):
         reward = reward.detach().cpu().numpy()
         
         return next_state, reward, done, info
+
+
+class DummyRewardModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, obs, vec):
+        return torch.zeros_like(vec)[:,0]

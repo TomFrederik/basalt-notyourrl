@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 
+import gym
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -50,6 +51,7 @@ def pretrain(
         next_pov = torch.from_numpy(np.array(next_pov))
         next_vec = torch.from_numpy(np.array(next_vec))
         weight = torch.from_numpy(np.array(weight))
+        cur_expert_action = np.array(cur_expert_action)
 
         # forward pass
         cur_q_values = q_net.forward(pov, vec)
@@ -60,7 +62,6 @@ def pretrain(
         optimizer.zero_grad(set_to_none=True)
 
         # compute loss
-        cur_expert_action = np.argmax(np.array(cur_expert_action), axis=1).astype(np.int64)
         pre_max_q = cur_q_values + supervised_loss_margin
         pre_max_q[np.arange(len(cur_expert_action)), cur_expert_action] -= supervised_loss_margin
         J_E = torch.max(pre_max_q, dim=1)[0] - cur_q_values[np.arange(len(cur_expert_action)), cur_expert_action]
@@ -103,7 +104,10 @@ def main(env_name, pretrain_steps, save_freq, model_path,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
          pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, update_freq):
     
-    wandb.init(project="DQfD_pretraining")
+    wandb.init(
+        project="DQfD_pretraining",
+        # mode="disabled",
+        )
     
     # set save dir
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
@@ -133,11 +137,13 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     # init q net
     vec_sample = dataset[0][0][1]
     vec_dim = vec_sample.shape[0]
-    print(f'{vec_dim = }')
-    
-    action_sample = dataset[0][3]
-    num_actions = len(action_sample)
-    print(f'{num_actions = }')
+    print(f'vec_dim = {vec_dim}')
+
+    env = gym.make(env_name)
+    num_actions = len(dataset.combined_memory.memory_dict['expert'].action_fn(env.action_space.sample())[0])
+    # action_sample = dataset[0][3]
+    # num_actions = len(action_sample)
+    print(f'num_actions = {num_actions}')
     
     q_net_kwargs = {
         'num_actions':num_actions,

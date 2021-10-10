@@ -10,21 +10,14 @@ from tqdm import tqdm
 from copy import deepcopy
 
 import torch
-import torch.nn as nn
 from torch.utils.data import Dataset
 import wandb
 
-from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper
+from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
 from common.state_shaping import StateWrapper, preprocess_state
 from common.DQfD_models import QNetwork
 
-class DummyRewardModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        
-    def forward(self, obs, vec):
-        return torch.zeros_like(vec)[:,0]
-        
+
 def train(
     log_dir, 
     new_model_path,
