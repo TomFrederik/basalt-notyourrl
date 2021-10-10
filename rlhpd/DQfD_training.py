@@ -24,8 +24,7 @@ class DummyRewardModel(nn.Module):
         
     def forward(self, obs, vec):
         return torch.zeros_like(vec)[:,0]
-
-
+        
 def train(
     log_dir, 
     new_model_path,
@@ -52,8 +51,7 @@ def train(
     
     # init env
     env = gym.make(env_name)
-    env = StateWrapper(env)
-    env = RewardActionWrapper(env_name, env, reward_model)
+    env = RewardActionWrapper(env_name, StateWrapper(env), reward_model)
     obs = env.reset()
     done = False
     
@@ -66,7 +64,7 @@ def train(
             print(steps)
             # compute q values
             with torch.no_grad():
-                q_input = {'pov': torch.from_numpy(obs['pov'].copy())[None], 'vec': torch.from_numpy(obs['vec'].copy())[None]}
+                q_input = {'pov': torch.from_numpy(obs['pov'].copy())[None].to(q_net.device), 'vec': torch.from_numpy(obs['vec'].copy())[None].to(q_net.device)}
                 q_values = q_net.forward(**q_input)[0]
                 q_action = torch.argmax(q_values).item()
                 
@@ -83,7 +81,7 @@ def train(
             estimated_episode_reward += reward
 
             # compute next q values
-            q_input = {'pov': torch.from_numpy(next_obs['pov'].copy())[None], 'vec': torch.from_numpy(next_obs['vec'].copy())[None]}
+            q_input = {'pov': torch.from_numpy(next_obs['pov'].copy())[None].to(q_net.device), 'vec': torch.from_numpy(next_obs['vec'].copy())[None].to(q_net.device)}
             next_q_values = q_net.forward(**q_input)[0]
             next_q_action = torch.argmax(next_q_values).item()
 
@@ -111,15 +109,15 @@ def train(
             pov, vec = zip(*state)
             next_pov, next_vec = zip(*next_state)
             #n_step_pov, n_step_vec = zip(*n_step_state)
-            pov = torch.from_numpy(np.array(pov))
-            vec = torch.from_numpy(np.array(vec))
-            next_pov = torch.from_numpy(np.array(next_pov))
-            next_vec = torch.from_numpy(np.array(next_vec))
+            pov = torch.from_numpy(np.array(pov)).to(q_net.device)
+            vec = torch.from_numpy(np.array(vec)).to(q_net.device)
+            next_pov = torch.from_numpy(np.array(next_pov)).to(q_net.device)
+            next_vec = torch.from_numpy(np.array(next_vec)).to(q_net.device)
             #n_step_pov = torch.from_numpy(np.array(n_step_pov))
             #n_step_vec = torch.from_numpy(np.array(n_step_vec))
-            reward = torch.from_numpy(np.array(reward))
-            weights = torch.from_numpy(np.array(weights))
-            expert_mask = torch.from_numpy(np.array(expert_mask))
+            reward = torch.from_numpy(np.array(reward)).to(q_net.device)
+            weights = torch.from_numpy(np.array(weights)).to(q_net.device)
+            expert_mask = torch.from_numpy(np.array(expert_mask)).to(q_net.device)
 
             # compute q values
             q_values = q_net.forward(pov, vec)
@@ -133,7 +131,7 @@ def train(
             next_target_q_action = torch.argmax(next_target_q_values, 1)
             
             # compute td error
-            updated_td_error = torch.abs(reward + discount_factor * next_q_values[torch.arange(batch_size), next_q_action] - q_values[torch.arange(batch_size), action])
+            updated_td_error = torch.abs(reward + discount_factor * next_q_values[torch.arange(batch_size), next_q_action] - q_values[torch.arange(batch_size), action]).detach().cpu()
 
             # zero gradients
             optimizer.zero_grad(set_to_none=True)
@@ -178,6 +176,9 @@ def train(
             if steps % update_freq == 0:
                 print('Updating target model...')
                 target_q_net = deepcopy(q_net)
+
+            steps += 1
+
         print(f'\nEpisode ended! Estimated reward: {estimated_episode_reward}\n')        
         wandb.log({'Training/Estimated Episode Reward': estimated_episode_reward})
 
@@ -185,7 +186,7 @@ def train(
     
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
-         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq):
+         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq, episodic_learning):
     
     wandb.init(project='DQfD_training')
     
@@ -196,12 +197,13 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
     log_dir = os.path.join(log_dir, env_name, str(int(time())))
     os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(new_model_path), exist_ok=True)
     
     # set device # TODO: use cuda?
-    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     # load q_net
-    q_net = torch.load(model_path)
+    q_net = torch.load(model_path).to(device)
 
     # load reward model
     if reward_model_path is None:
@@ -241,7 +243,7 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
         update_freq,
         epsilon
     )
-    
+
     print('Training finished! Saving model...')
     torch.save(q_net, new_model_path)
 
@@ -253,6 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--new_model_path', type=str, required=True)
     parser.add_argument('--reward_model_path', type=str, default=None)#, required=True)
+    parser.add_argument('--episodic_learning', action='store_false')
     parser.add_argument('--num_expert_episodes', type=int, default=100)
     parser.add_argument('--n_step', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
@@ -273,3 +276,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     main(**vars(args))
+
+
+
+
+
