@@ -15,6 +15,7 @@ import wandb
 
 from common.DQfD_utils import MemoryDataset
 from common.DQfD_models import QNetwork
+from common.action_shaping import INVENTORY
 
 def pretrain(
     log_dir, 
@@ -107,6 +108,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     wandb.init(
         project="DQfD_pretraining",
         # mode="disabled",
+        tags=['basalt']
         )
     
     # set save dir
@@ -139,10 +141,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     vec_dim = vec_sample.shape[0]
     print(f'vec_dim = {vec_dim}')
 
-    env = gym.make(env_name)
-    num_actions = len(dataset.combined_memory.memory_dict['expert'].action_fn(env.action_space.sample())[0])
-    # action_sample = dataset[0][3]
-    # num_actions = len(action_sample)
+    num_actions = (len(INVENTORY[env_name]) + 1) * 360
     print(f'num_actions = {num_actions}')
     
     q_net_kwargs = {
