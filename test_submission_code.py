@@ -5,6 +5,20 @@ from stable_baselines3.common.utils import get_device
 import numpy as np
 import os 
 
+# TODO:
+
+# - import trained agent from 'train' directory
+
+# In the MineRLAgent class:
+# - load the model in the 'load_agent' method 
+# - is some preprocessing necessary?
+# - in the run_agent_on_episode method, replace the random agent with our model in the one-episode env interaction
+
+# In the 'MineRLBehavioralCloningAgent' class:
+# - in the 'load_agent' method, load the right agent's policy
+# - in the 'run_agent_on_episode', wrap environment with wrappers from BC training
+
+
 class EpisodeDone(Exception):
     pass
 
@@ -83,6 +97,35 @@ class MineRLAgent():
             single_episode_env.step(random_act)
             steps += 1
 
+class Agent(MineRLAgent):
+    def load_agent(self):
+        self.q_net = th.load(f"train/MineRLBasalt{os.getenv('MINERL_TRACK')}-v0.pt", map_location=th.device(get_device('auto')))
+        self.q_net.eval()
+    def run_agent_on_episode(self, single_episode_env : Episode):
+        wrappers = [(StateWrapper, {}), (RewardActionWrapper, {"env_name": f"MineRLBasalt{os.getenv('MINERL_TRACK')}-v0", 'reward_model': th.load(reward_model_path, map_location=th.device(get_device('auto')))})]
+        single_episode_env.wrap_env(wrappers)
+
+        obs = single_episode_env.reset()
+        done = False
+        while not done:
+            pov, vec = obs.values()
+            pov = th.from_numpy(pov.copy())[None].to(get_device('auto'))
+            vec = th.from_numpy(vec.copy())[None].to(get_device('auto'))
+
+             
+
+            q_values = self.q_net()
+            action, _, _ = self.policy.forward(th.from_numpy(obs.copy()).unsqueeze(0).to(get_device('auto')))
+            try:
+                if action.device.type == 'cuda':
+                    action = action.cpu()
+                obs, reward, done, _ = single_episode_env.step(np.squeeze(action.numpy()))
+            except EpisodeDone:
+                done = True
+                continue
+
+
+        
 class MineRLBehavioralCloningAgent(MineRLAgent):
     def load_agent(self):
         # TODO not sure how to get us to be able to load the policy from the right agent here
