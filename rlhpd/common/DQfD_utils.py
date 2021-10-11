@@ -43,9 +43,6 @@ class ReplayBuffer(object):
         
         for t in range(len(obs)-self.n_step):
             state = preprocess_state(obs[t])
-            print(f'{actions[t] = }')
-            print(f'{type(actions[t]) = }')
-            print(f'{actions[t].keys() = }')
             action = self.action_fn(actions[t])[1]
             reward = rewards[t]
             td_error = td_errors[t]

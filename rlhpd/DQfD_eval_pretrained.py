@@ -84,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_episodes', type=int, default=1)
     parser.add_argument('--max_episode_len', type=int, default=2000)
     parser.add_argument('--model_path', type=str, required=True)
-    parser.add_argument('--video_dir', type=str, default='./pretrain_videos')
+    parser.add_argument('--video_dir', type=str, default='./output/videos')
     parser.add_argument('--epsilon', type=float, default=0.01, help='Epsilon for epsilon-greedy behaviour')
 
     main(**vars(parser.parse_args()))
