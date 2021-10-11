@@ -43,6 +43,9 @@ class ReplayBuffer(object):
         
         for t in range(len(obs)-self.n_step):
             state = preprocess_state(obs[t])
+            print(f'{actions[t] = }')
+            print(f'{type(actions[t]) = }')
+            print(f'{actions[t].keys() = }')
             action = self.action_fn(actions[t])[1]
             reward = rewards[t]
             td_error = td_errors[t]
@@ -146,7 +149,7 @@ class MemoryDataset(Dataset):
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
         self.env_name = env_name
-        action_fn = partial(action_shaping_complex, env_name)
+        action_fn = partial(action_shaping_complex, env_name=env_name)
         self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
         
