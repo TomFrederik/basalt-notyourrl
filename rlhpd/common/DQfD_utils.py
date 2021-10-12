@@ -256,7 +256,7 @@ class RewardWrapper(gym.Wrapper):
 
 
 class RewardActionWrapper(gym.Wrapper):
-    def __init__(self, env_name, env, reward_model):
+    def __init__(self, env, env_name, reward_model):
         super().__init__(env)
         self.env = env
         self.env_name = env_name
