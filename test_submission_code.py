@@ -114,7 +114,7 @@ class MineRLAgent():
         """
         reward_model = RewardModel()
         reward_model.load_state_dict(th.load(Path(self.cfg.reward.best_model_path), map_location=get_device('auto')))
-        wrappers = [(state_shaping.StateWrapper, {}), (RewardActionWrapper, {"env_name": self.env_name, "reward_model": reward_model})]
+        wrappers = [(state_shaping.StateWrapper, {'env_name':env_name}), (RewardActionWrapper, {"env_name": self.env_name, "reward_model": reward_model})]
         single_episode_env.wrap_env(wrappers)
 
         obs = single_episode_env.reset()

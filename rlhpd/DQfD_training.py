@@ -17,7 +17,7 @@ from common.action_shaping import INVENTORY
 from common.DQfD_models import QNetwork
 from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
 from common.reward_model import RewardModel
-from common.state_shaping import StateWrapper, preprocess_state
+from common.state_shaping import StateWrapper
 
 
 def train(
@@ -46,7 +46,7 @@ def train(
     
     # init env
     env = gym.make(env_name)
-    env = RewardActionWrapper(StateWrapper(env), env_name, reward_model)
+    env = RewardActionWrapper(StateWrapper(env, env_name), env_name, reward_model)
     obs = env.reset()
     done = False
     
