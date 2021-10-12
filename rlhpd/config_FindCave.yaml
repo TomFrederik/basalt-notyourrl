@@ -25,7 +25,7 @@ dqfd_args:
     env_name: MineRLBasaltFindCave-v0
     data_dir: ../data  #TODO -> change this accordingly
     log_dir: ./output
-    num_expert_episodes: 1 # usually less than 100 are available -> takes all episodes
+    num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
     horizon: 50
     batch_size: 100
     save_freq: 100
@@ -42,7 +42,7 @@ dqfd_args:
 
 # args that are special to pretraining
 pretrain_dqfd_args:
-    pretrain_steps: 500 # 10000
+    pretrain_steps: 10000
     model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
     n_hid: 64
     vec_feature_dim: 128
