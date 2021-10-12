@@ -96,8 +96,8 @@ rate_ui:
 
 reward:
     wandb_project: 4-train-reward
-    save_dir: ./output/reward_models
-    best_model_path: ./output/reward_models/best.pt
+    save_dir: rlhpd/output/reward_models
+    best_model_path: rlhpd/output/reward_models/best.pt
     # Training params
     rand_seed: 1
     max_num_pairs: 100000

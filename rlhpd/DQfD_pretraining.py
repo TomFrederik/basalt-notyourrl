@@ -92,7 +92,7 @@ def pretrain(
         
         if steps % save_freq == 0:
             print('Saving model...')
-            torch.save(q_net, model_path)
+            torch.save(q_net.state_dict(), model_path)
         
         if steps % update_freq == 0:
             print('Updating target model...')

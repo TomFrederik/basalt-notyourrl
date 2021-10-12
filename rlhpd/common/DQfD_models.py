@@ -50,10 +50,10 @@ class QNetwork(nn.Module):
         
         # preprocess other observations
         vec_features = self.vec_network(vec)
-        
+
         # concat inputs
         q_net_input = torch.cat([pov_features, vec_features], dim=1)
-        
+
         return self.q_net(q_net_input)
     
 
