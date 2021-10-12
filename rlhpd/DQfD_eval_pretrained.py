@@ -10,7 +10,7 @@ import cv2
 
 import minerl
 from common.DQfD_models import QNetwork
-from common.state_shaping import preprocess_non_pov_obs, StateWrapper
+from common.state_shaping import StateWrapper
 from common.DQfD_utils import RewardActionWrapper, DummyRewardModel
 
 
@@ -31,7 +31,7 @@ def main(
 
     # init env
     env = gym.make(env_name)
-    env = StateWrapper(env)
+    env = StateWrapper(env, env_name)
     env = RewardActionWrapper(env, env_name, DummyRewardModel())
 
     for i in range(num_episodes):

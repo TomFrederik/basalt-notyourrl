@@ -20,12 +20,13 @@ Transition = namedtuple('Transition',
 
 class ReplayBuffer(object):
 
-    def __init__(self, capacity, n_step, discount_factor, p_offset, action_fn):
+    def __init__(self, capacity, n_step, discount_factor, p_offset, action_fn, process_state_fn):
         self.n_step = n_step
         self.discount_factor = discount_factor
         self.p_offset = p_offset
         self.memory = deque([],maxlen=capacity)
         self.action_fn = action_fn
+        self.process_state_fn = process_state_fn
         
         self.discount_array = np.array([self.discount_factor ** i for i in range(self.n_step)])
 
@@ -42,14 +43,14 @@ class ReplayBuffer(object):
         '''
         
         for t in range(len(obs)-self.n_step):
-            state = preprocess_state(obs[t])
+            state = self.process_state_fn(obs[t])
             action = self.action_fn(actions[t])[1]
             reward = rewards[t]
             td_error = td_errors[t]
             
             if t + self.n_step < len(obs):
-                next_state = preprocess_state(obs[t+1])
-                n_step_state = preprocess_state(obs[t+self.n_step])
+                next_state = self.process_state_fn(obs[t+1])
+                n_step_state = self.process_state_fn(obs[t+self.n_step])
                 n_step_reward = np.sum(rewards[t:t+self.n_step] * self.discount_array)
             else:
                 raise NotImplementedError(f't = {t}, len(obs) = {len(obs)}')
@@ -65,7 +66,7 @@ class ReplayBuffer(object):
 
 
 class CombinedMemory(object):
-    def __init__(self, agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn):
+    def __init__(self, agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn, process_state_fn):
         '''
         Class to combine expert and agent memory
         '''
@@ -74,8 +75,8 @@ class CombinedMemory(object):
         self.PER_exponent = PER_exponent
         self.IS_exponent = IS_exponent
         self.memory_dict = {
-            'expert':ReplayBuffer(None, n_step, self.discount_factor, p_offset['expert'], action_fn),
-            'agent':ReplayBuffer(agent_memory_capacity, n_step, self.discount_factor, p_offset['agent'], action_fn)
+            'expert':ReplayBuffer(None, n_step, self.discount_factor, p_offset['expert'], action_fn, process_state_fn),
+            'agent':ReplayBuffer(agent_memory_capacity, n_step, self.discount_factor, p_offset['agent'], action_fn, process_state_fn)
         }
         
     def __len__(self):
@@ -147,7 +148,8 @@ class MemoryDataset(Dataset):
         '''
         self.env_name = env_name
         action_fn = partial(action_shaping_complex, env_name=env_name)
-        self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn)
+        process_state_fn = partial(preprocess_state, env_name=env_name)
+        self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn, process_state_fn)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
         
     def __len__(self):
