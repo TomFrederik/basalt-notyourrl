@@ -1,15 +1,17 @@
 import gym
 import torch as th
-from basalt_utils import sb3_compat
+#from basalt_utils import sb3_compat
 #from basalt_baselines.bc import bc_baseline, WRAPPERS as bc_wrappers
 from stable_baselines3.common.utils import get_device
-from rlhpd.common import state_shaping
-from rlhpd.common.DQfD_utils import RewardActionWrapper
-from rlhpd.common import utils
 import numpy as np
 import os 
 from pathlib import Path
 
+from rlhpd.common import state_shaping, utils
+from rlhpd.common.action_shaping import INVENTORY
+from rlhpd.common.DQfD_models import QNetwork
+from rlhpd.common.DQfD_utils import RewardActionWrapper
+from rlhpd.common.reward_model import RewardModel
 
 # TODO:
 
@@ -74,7 +76,28 @@ class MineRLAgent():
         THIS METHOD IS ONLY CALLED ONCE AT THE BEGINNING OF THE EVALUATION.
         DO NOT LOAD YOUR MODEL ANYWHERE ELSE.
         """
-        self.q_net = th.load(f"train/MineRLBasalt{os.getenv('MINERL_TRACK')}-v0.pt", map_location=th.device(get_device('auto')))
+        self.cfg = utils.load_config("rlhpd/config.yaml")
+        self.env_name = f"MineRLBasalt{os.getenv('MINERL_TRACK')}-v0"
+        
+        state = gym.make(self.env_name).observation_space.sample()
+        inv = list(state['inventory'].values())
+        vec_dim = 2 * len(inv) + 5
+        print(f'vec_dim = {vec_dim}')
+
+        num_actions = (len(INVENTORY[self.env_name]) + 1) * 360
+        print(f'num_actions = {num_actions}')
+        q_net_kwargs = {
+            'num_actions':num_actions,
+            'vec_dim':vec_dim,
+            'n_hid':self.cfg.pretrain_dqfd_args.n_hid,
+            'pov_feature_dim':self.cfg.pretrain_dqfd_args.pov_feature_dim,
+            'vec_feature_dim':self.cfg.pretrain_dqfd_args.vec_feature_dim,
+            'vec_network_dim':self.cfg.pretrain_dqfd_args.vec_network_dim,
+            'q_net_dim':self.cfg.pretrain_dqfd_args.q_net_dim
+        }
+        self.q_net = QNetwork(**q_net_kwargs)
+        self.q_net.load_state_dict(th.load(f"train/{self.env_name}.pt", map_location=get_device('auto')))
+        self.q_net = self.q_net.to(get_device('auto'))
         self.q_net.eval()
 
     def run_agent_on_episode(self, single_episode_env: Episode):
@@ -89,23 +112,21 @@ class MineRLAgent():
         Args:
             env (gym.Env): The env your agent should interact with.
         """
-        cfg = utils.load_config("rlhpd/config.yaml")
-        task = f"MineRLBasalt{os.getenv('MINERL_TRACK')}-v0"
-        wrappers = [(state_shaping.StateWrapper, {}), (RewardActionWrapper, {"env_name": task, "reward_model": th.load(Path(cfg.reward.best_model_path), map_location=th.device(get_device('auto')))})]
+        reward_model = RewardModel()
+        reward_model.load_state_dict(th.load(Path(self.cfg.reward.best_model_path), map_location=get_device('auto')))
+        wrappers = [(state_shaping.StateWrapper, {}), (RewardActionWrapper, {"env_name": self.env_name, "reward_model": reward_model})]
         single_episode_env.wrap_env(wrappers)
 
         obs = single_episode_env.reset()
         done = False
         while not done:
-            pov, vec = obs.values()
+            pov, vec = obs['pov'], obs['vec']
             pov = th.from_numpy(pov.copy())[None].to(get_device('auto'))
             vec = th.from_numpy(vec.copy())[None].to(get_device('auto'))
-            q_values = self.q_net.forward(pov,vec)
+            q_values = self.q_net.forward(pov, vec)
             q_action = th.argmax(q_values).item()
             try:
-                if q_action.device.type == 'cuda':
-                    _action = q_action.cpu()
-                obs, reward, done, _ = single_episode_env.step(np.squeeze(q_action.numpy()))
+                obs, reward, done, _ = single_episode_env.step(np.array(q_action))
             except EpisodeDone:
                 done = True
                 continue

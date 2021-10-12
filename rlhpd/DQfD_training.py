@@ -13,9 +13,11 @@ import torch
 from torch.utils.data import Dataset
 import wandb
 
-from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
-from common.state_shaping import StateWrapper, preprocess_state
+from common.action_shaping import INVENTORY
 from common.DQfD_models import QNetwork
+from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
+from common.reward_model import RewardModel
+from common.state_shaping import StateWrapper, preprocess_state
 
 
 def train(
@@ -179,7 +181,8 @@ def train(
     
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
          lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
-         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq, episodic_learning):
+         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq, episodic_learning,
+         n_hid, pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim):
     
     wandb.init(project='DQfD_training')
     
@@ -195,14 +198,13 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     # set device # TODO: use cuda?
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    # load q_net
-    q_net = torch.load(model_path).to(device)
 
     # load reward model
     if reward_model_path is None:
         reward_model = DummyRewardModel()
     else:
-        reward_model = torch.load(reward_model_path)
+        reward_model = RewardModel()
+        reward_model = reward_model.load_state_dict(torch.load(reward_model_path))
     
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -219,6 +221,26 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     )
 
     # launch training
+    # load q_net
+    vec_sample = dataset[0][0][1]
+    vec_dim = vec_sample.shape[0]
+    print(f'vec_dim = {vec_dim}')
+
+    num_actions = (len(INVENTORY[env_name]) + 1) * 360
+    print(f'num_actions = {num_actions}')
+    q_net_kwargs = {
+        'num_actions':num_actions,
+        'vec_dim':vec_dim,
+        'n_hid':n_hid,
+        'pov_feature_dim':pov_feature_dim,
+        'vec_feature_dim':vec_feature_dim,
+        'vec_network_dim':vec_network_dim,
+        'q_net_dim':q_net_dim
+    }
+    q_net = QNetwork(**q_net_kwargs)
+    q_net.load_state_dict(torch.load(model_path))
+    q_net = q_net.to(device)
+
     q_net = train(
         log_dir,
         new_model_path,
@@ -265,6 +287,12 @@ if __name__ == '__main__':
     parser.add_argument('--discount_factor', type=float, default=0.99)
     parser.add_argument('--agent_memory_capacity', type=int, default=20000)
     parser.add_argument('--train_steps', type=int, default=100000)
+    parser.add_argument('--n_hid', type=int, default=64)
+    parser.add_argument('--vec_feature_dim', type=int, default=128)
+    parser.add_argument('--vec_network_dim', type=int, default=128)
+    parser.add_argument('--pov_feature_dim', type=int, default=128)
+    parser.add_argument('--q_net_dim', type=int, default=128)
+    
     
     args = parser.parse_args()
     
