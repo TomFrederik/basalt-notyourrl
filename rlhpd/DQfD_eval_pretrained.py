@@ -32,7 +32,7 @@ def main(
     # init env
     env = gym.make(env_name)
     env = StateWrapper(env)
-    env = RewardActionWrapper(env_name, env, DummyRewardModel())
+    env = RewardActionWrapper(env, env_name, DummyRewardModel())
 
     for i in range(num_episodes):
         print(f'\nStarting episode {i+1}')

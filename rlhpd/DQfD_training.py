@@ -44,7 +44,7 @@ def train(
     
     # init env
     env = gym.make(env_name)
-    env = RewardActionWrapper(env_name, StateWrapper(env), reward_model)
+    env = RewardActionWrapper(StateWrapper(env), env_name, reward_model)
     obs = env.reset()
     done = False
     
