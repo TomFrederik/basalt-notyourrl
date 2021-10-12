@@ -106,7 +106,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
          pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, update_freq):
     
     wandb.init(
-        project="DQfD_pretraining",
+        project=f"DQfD_pretraining_{env_name}",
         # mode="disabled",
         tags=['basalt']
         )
@@ -171,7 +171,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
         update_freq
     )
     
-    print('Training finished! Saving model...')
+    print(f'Training finished! Saving model to {model_path} ...')
     torch.save(q_net, model_path)
 
 if __name__ == '__main__':
