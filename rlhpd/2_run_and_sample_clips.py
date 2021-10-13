@@ -127,7 +127,7 @@ class DataBaseFiller:
                 sample_path = save_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}.pickle"
                 self._write_to_file(sample_path, sample)
 
-    def _generate_demo_clips(self):
+    def _generate_demo_clips(self, demo_clips_dir):
         minerl_data = minerl.data.make(self.env_task, data_dir=self.demos_dir)
         traj_names = minerl_data.get_trajectory_names()
 
@@ -145,13 +145,13 @@ class DataBaseFiller:
             # Mimics what the state_shaping.StateWrapper does, but for the demo actions
             for frame in clip:
                 state, action, reward, next_state, done, meta = frame
-                frame[0]['vec'] = state_shaping.preprocess_non_pov_obs(state)
+                frame[0]['vec'] = state_shaping.preprocess_non_pov_obs(state, cfg.env_task)
 
             # Take note of the clip position within the trajectory; this is useful for
             # autolabelling early/late portions of the trajectory
             normalized_idx = start_idx / (len(traj_frames) - self.sample_length)
             percent = 100 * normalized_idx
-            demo_path = clips_dir / f"demo_{i:03d}_{random_traj}_{percent:03d}.pickle"
+            demo_path = demo_clips_dir / f"demo_{i:03d}_{random_traj}_{percent:03f}.pickle"
             self._write_to_file(demo_path, clip)
 
     def _insert_all_pairs_into_db(self, good_paths, bad_paths, shuffle=True, max_pairs=None):
@@ -236,7 +236,7 @@ class DataBaseFiller:
         demo_clips_dir = self.clips_dir / "demos"
 
         print("Generating demo clips")
-        self._generate_policy_clips(random_clips_dir)
+        #self._generate_policy_clips(random_clips_dir)
         print("Generating random clips")
         self._generate_demo_clips(demo_clips_dir)
         # print("Generating trained policy clips")
