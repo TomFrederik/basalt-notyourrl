@@ -12,10 +12,10 @@ import wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import common.preference_helpers as pref
-import common.utils as utils
-from common.dataset import TrajectoryPreferencesDataset
-from common.reward_model import RewardModel
+from .common import preference_helpers as pref
+from .common import utils
+from .common.dataset import TrajectoryPreferencesDataset
+from .common.reward_model import RewardModel
 
 
 def get_pred_accuracy(prefer_probs, true_judgements):
@@ -53,14 +53,7 @@ def evaluate_model_accuracy(reward_model, dataloader, max_batches=None, ret_rewa
         return mean_acc, all_pred_rewards
     return mean_acc
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train reward model with initial preferences')
-    parser.add_argument("-c", "--config-file", default="config.yaml",
-                        help="Initial config file. Default: %(default)s")
-    options = parser.parse_args()
-
-    # Params
-    cfg = utils.load_config(options.config_file)
+def main(cfg):
 
     wandb.init(
         project=f"reward_training_{cfg.env_task}",
@@ -172,3 +165,15 @@ if __name__ == '__main__':
     # Also save final model to the "best" path
     torch.save(reward_model.state_dict(), cfg.reward.best_model_path)
     print("Saved model to", cfg.reward.best_model_path)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train reward model with initial preferences')
+    parser.add_argument("-c", "--config-file", default="config.yaml",
+                        help="Initial config file. Default: %(default)s")
+    options = parser.parse_args()
+
+    # Load config params
+    cfg = utils.load_config(options.config_file)
+    
+    main(cfg)

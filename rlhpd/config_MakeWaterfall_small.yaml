@@ -8,7 +8,7 @@
 # # See: https://github.com/Infinidat/munch
 # print(cfg.out.base_dir)
 
-env_task: MineRLBasaltFindCave-v0
+env_task: MineRLBasaltMakeWaterfall-v0
 demos_dir: ./data
 #demos_dir: /home/alex/minerl_data
 wandb_entity: junshern
@@ -19,10 +19,10 @@ wandb_entity: junshern
 
 # DQfD args that are common to both pretraining and training
 dqfd_args:
-    env_name: MineRLBasaltFindCave-v0
+    env_name: MineRLBasaltMakeWaterfall-v0
     data_dir: ./data  #TODO -> change this accordingly
     log_dir: ./output
-    num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
+    num_expert_episodes: 1 # usually less than 100 are available -> takes all episodes
     horizon: 50
     batch_size: 100
     save_freq: 100
@@ -44,42 +44,42 @@ dqfd_args:
 
 # args that are special to pretraining
 pretrain_dqfd_args:
-    pretrain_steps: 10000
-    model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
+    pretrain_steps: 10
+    model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
 
 # args that are special to training
 train_dqfd_args:
     agent_memory_capacity: 100000 
-    train_steps: 100000
-    max_env_steps: 5000
-    model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
-    new_model_path: ./output/MineRLBasaltFindCave-v0/Q_1.pth
-    reward_model_path: ./output/MineRLBasaltFindCave-v0/reward_models/best.pt
+    train_steps: 10
+    max_env_steps: 100
+    model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
+    new_model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_1.pth
+    reward_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_models/best.pt
 
 ###########
 # Sampling
 ###########
 
 sampler:
-    db_path: ./output/MineRLBasaltFindCave-v0/annotation_buffer.db
-    clips_dir: ./output/MineRLBasaltFindCave-v0/clips/
+    db_path: ./output/MineRLBasaltMakeWaterfall-v0/annotation_buffer.db
+    clips_dir: ./output/MineRLBasaltMakeWaterfall-v0/clips/
     rnd_seed: 0
     # All clips
     sample_length: 20
     max_pairs_per_autolabel_type: 100000
     # Random
-    num_traj: 20
+    num_traj: 1
     traj_length: 1000
     num_random_clips_per_traj: 50 # 200 * 5 -> 1000
     # Demos
-    num_demo_clips: 1000
+    num_demo_clips: 10
 
 ###########
 # Rating
 ###########
 
 rate_ui:
-    videos_dir: ./output/MineRLBasaltFindCave-v0/videos
+    videos_dir: ./output/MineRLBasaltMakeWaterfall-v0/videos
     video_fps: 20
 
 ###########
@@ -88,11 +88,11 @@ rate_ui:
 
 reward:
     wandb_project: 4-train-reward
-    save_dir: ./output/MineRLBasaltFindCave-v0/reward_models
-    best_model_path: ./output/MineRLBasaltFindCave-v0/reward_models/best.pt
+    save_dir: ./output/MineRLBasaltMakeWaterfall-v0/reward_models
+    best_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_models/best.pt
     # Training params
     rand_seed: 1
-    max_num_pairs: 100000
+    max_num_pairs: 100
     val_split: 0.05
     val_every_n_batch: 100
     save_every_n_batch: 500

@@ -77,8 +77,8 @@ class MineRLAgent():
         THIS METHOD IS ONLY CALLED ONCE AT THE BEGINNING OF THE EVALUATION.
         DO NOT LOAD YOUR MODEL ANYWHERE ELSE.
         """
-        f = open("aicrowd.json",)
-        ai_crowd_json = json.load(f)
+        with open("aicrowd.json",) as f:
+            ai_crowd_json = json.load(f)
         if ai_crowd_json["tags"] == "BuildVillageHouse":
             self.cfg = utils.load_config("rlhpd/config_BuildVillageHouse.yaml")
         elif ai_crowd_json["tags"] == "MakeWaterfall":
