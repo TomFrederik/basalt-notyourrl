@@ -63,10 +63,10 @@ if __name__ == '__main__':
     cfg = utils.load_config(options.config_file)
 
     wandb.init(
-        project=cfg.reward.wandb_project, 
-        entity=cfg.wandb_entity,
-        # mode="disabled",
-    )
+        project=f"reward_training_{cfg.env_task}",
+        mode="disabled",
+        tags=['basalt']
+        )
 
     save_dir = Path(cfg.reward.save_dir) / wandb.run.name
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -81,7 +81,7 @@ if __name__ == '__main__':
         betas=cfg.reward.adam_betas,
         eps=cfg.reward.adam_eps)
 
-    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.traj_dir, cfg.sampler.db_path)
+    full_dataset = TrajectoryPreferencesDataset(cfg.sampler.db_path)
     val_size = int(cfg.reward.val_split * len(full_dataset))
     train_size = len(full_dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
@@ -171,4 +171,4 @@ if __name__ == '__main__':
     print("Saved model to", save_path)
     # Also save final model to the "best" path
     torch.save(reward_model.state_dict(), cfg.reward.best_model_path)
-    print("Saved model to", save_path)
+    print("Saved model to", cfg.reward.best_model_path)

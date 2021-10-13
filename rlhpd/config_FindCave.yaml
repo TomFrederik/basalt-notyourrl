@@ -13,9 +13,6 @@ demos_dir: ../data
 #demos_dir: /home/alex/minerl_data
 wandb_entity: junshern
 
-out:
-    base_dir: ./output
-
 ##########
 # DQfD
 ##########
@@ -91,8 +88,8 @@ rate_ui:
 
 reward:
     wandb_project: 4-train-reward
-    save_dir: ./output/reward_models
-    best_model_path: ./output/reward_models/best.pt
+    save_dir: ./output/MineRLBasaltFindCave-v0/reward_models
+    best_model_path: ./output/MineRLBasaltFindCave-v0/reward_models/best.pt
     # Training params
     rand_seed: 1
     max_num_pairs: 100000

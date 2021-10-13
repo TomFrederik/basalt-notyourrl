@@ -15,7 +15,7 @@ from .database import AnnotationBuffer
 class TrajectoryPreferencesDataset(Dataset):
     """Trajectory preferences dataset."""
 
-    def __init__(self, data_dir, annotation_db_path=None, transform=None):
+    def __init__(self, annotation_db_path=None):
         """
         Args:
             data_dir (string): Path to the directory containing pickled trajectory
@@ -24,29 +24,12 @@ class TrajectoryPreferencesDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.annotation_db_path = annotation_db_path
-        self.data_dir = Path(data_dir)
-        assert self.data_dir.is_dir()
-        self.labels = None
+        self.annotation_db_path = Path(annotation_db_path)
+        assert self.annotation_db_path.is_file()
 
-        if annotation_db_path is not None:
-            db = AnnotationBuffer(annotation_db_path)
-            path_pairs, labels = db.get_all_rated_pairs_with_labels()
-            self.labels = [db.label_to_judgement(l) for l in labels]
-        else:
-            # If annotation_db not given, assume that we have reward-labelled clips
-            # so we can just load any pair of clips and simulate the judgement ourselves
-            traj_paths = sorted([x for x in Path(data_dir).glob("*.pickle")])
-            # Populate all possible pairs
-            path_pairs = []
-            for path_a in traj_paths:
-                for path_b in traj_paths:
-                    if path_a == path_b:
-                        continue
-                    path_pairs.append((path_a, path_b))
-
-        self.traj_path_pairs = path_pairs
-        self.transform = transform
+        db = AnnotationBuffer(annotation_db_path)
+        self.traj_path_pairs, labels = db.get_all_rated_pairs_with_labels()
+        self.labels = [db.label_to_judgement(l) for l in labels]
 
     def __len__(self):
         return len(self.traj_path_pairs)
@@ -61,11 +44,11 @@ class TrajectoryPreferencesDataset(Dataset):
         clip_b = utils.load_clip_from_file(traj_path_b)
         assert len(clip_a) == len(clip_b), (traj_path_a, traj_path_b)
 
-        if self.labels is None:
-            # Compute judgement based on rewards
-            judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
-        else:
-            judgement = torch.as_tensor(self.labels[idx])
+        # if self.labels is None:
+        #     # Compute judgement based on rewards
+        #     judgement = torch.as_tensor(pref.simulate_judgement(clip_a, clip_b))
+        # else:
+        judgement = torch.as_tensor(self.labels[idx])
 
         frames_a, vec_a = utils.get_frames_and_vec_from_clip(clip_a)
         frames_b, vec_b = utils.get_frames_and_vec_from_clip(clip_b)
@@ -88,6 +71,9 @@ class TrajectoryPreferencesDataset(Dataset):
             frames_a, vec_a, frames_b, vec_b = frames_b, vec_b, frames_a, vec_a
             judgement = torch.tensor([1,1]) - judgement
 
+        assert frames_a.shape == frames_b.shape
+        assert frames_a.shape == (len(frames_a), 3, 64, 64)
+        assert judgement.shape == (2,)
         sample = {
             # State a
             'frames_a': frames_a,
