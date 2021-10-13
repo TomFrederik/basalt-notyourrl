@@ -3,5 +3,5 @@
   "authors": ["jun_shern_chan", "gabbro", "Alexfrs", "tom4", "alexandra_souly"],
   "description": "Test Model for MineRL BASALT Challenge",
   "tags": "BuildVillageHouse",
-  "gpu": false
+  "gpu": true
 }
