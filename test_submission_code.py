@@ -5,6 +5,7 @@ import torch as th
 from stable_baselines3.common.utils import get_device
 import numpy as np
 import os 
+import json
 from pathlib import Path
 
 from rlhpd.common import state_shaping, utils
@@ -76,8 +77,19 @@ class MineRLAgent():
         THIS METHOD IS ONLY CALLED ONCE AT THE BEGINNING OF THE EVALUATION.
         DO NOT LOAD YOUR MODEL ANYWHERE ELSE.
         """
-        self.cfg = utils.load_config("rlhpd/config.yaml")
-        self.env_name = f"MineRLBasalt{os.getenv('MINERL_TRACK')}-v0"
+        f = open("aicrowd.json",)
+        ai_crowd_json = json.load(f)
+        if ai_crowd_json["tags"] == "BuildVillageHouse":
+            self.cfg = utils.load_config("rlhpd/config_BuildVillageHouse.yaml")
+        elif ai_crowd_json["tags"] == "MakeWaterfall":
+            self.cfg = utils.load_config("rlhpd/config_MakeWaterfall.yaml")
+        elif ai_crowd_json["tags"] == "FindCave":
+            self.cfg = utils.load_config("rlhpd/config_FindCave.yaml")
+        elif ai_crowd_json["tags"] == "VillageAnimalPen":
+            self.cfg = utils.load_config("rlhpd/config_VillageAnimalPen.yaml")
+        else: 
+            Exception("tag is wrong")
+        self.env_name = self.cfg.env_task
         
         state = gym.make(self.env_name).observation_space.sample()
         inv = list(state['inventory'].values())
