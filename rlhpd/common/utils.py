@@ -30,7 +30,6 @@ def get_frames_and_vec_from_clip(clip: list):
     clip: list of tuples (state, action, reward, next_state, done, meta)
     """
     frames = torch.stack([torch.as_tensor(state['pov'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip], axis=0)
-    frames = einops.rearrange(frames, 't h w c -> t c h w') / 255
     vec = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip], axis=0)
     return frames, vec
 
