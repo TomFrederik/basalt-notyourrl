@@ -12,7 +12,7 @@ import minerl
 from common.DQfD_models import QNetwork
 from common.state_shaping import StateWrapper
 from common.DQfD_utils import RewardActionWrapper, DummyRewardModel
-
+from common.action_shaping import INVENTORY
 
 def main(
     env_name,
@@ -25,14 +25,26 @@ def main(
     # check that video_dir exists
     os.makedirs(video_dir, exist_ok=True)
 
-    # load model
-    q_net: QNetwork = torch.load(model_path)
-    q_net.eval()
-
     # init env
     env = gym.make(env_name)
     env = StateWrapper(env, env_name)
     env = RewardActionWrapper(env, env_name, DummyRewardModel())
+    
+    # load model
+    vec_sample = env.observation_space.sample()['vec']
+    vec_dim = vec_sample.shape[0]
+    print(f'vec_dim = {vec_dim}')
+
+    num_actions = (len(INVENTORY[env_name]) + 1) * 360
+    print(f'num_actions = {num_actions}')
+    q_net_kwargs = {
+        'num_actions':num_actions,
+        'vec_dim':vec_dim,
+    }
+    q_net = QNetwork(**q_net_kwargs)
+    q_net.load_state_dict(torch.load(model_path))
+    #q_net = torch.load(model_path)
+    q_net.eval()
 
     for i in range(num_episodes):
         print(f'\nStarting episode {i+1}')

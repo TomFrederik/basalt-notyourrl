@@ -43,6 +43,7 @@ def basic_train():
     This function will be called for training phase.
     This should produce and save same files you upload during your submission.
     """
+    """
     # How to sample minerl data is document here:
     # http://minerl.io/docs/tutorials/data_sampling.html
     data = minerl.data.make('MineRLBasaltFindCave-v0', data_dir=MINERL_DATA_ROOT)
@@ -70,8 +71,10 @@ def basic_train():
     np.save("./train/parameters.npy", np.random.random((10,)))
 
     # Training 100% Completed
+    """
+    print('Skipping training for now')
     aicrowd_helper.register_progress(1)
-    env.close()
+    #env.close()
 
 
 def main():

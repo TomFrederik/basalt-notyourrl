@@ -264,7 +264,7 @@ if __name__ == '__main__':
     env_task = cfg.env_task
     print(f"Initializing environment {env_task}. This might take a while...")
     env = gym.make(env_task)
-    env = state_shaping.StateWrapper(env)
+    env = state_shaping.StateWrapper(env, cfg.env_task)
     print("Done initializing environment!")
 
     db_filler = DataBaseFiller(cfg=cfg, env=env)

@@ -1,17 +1,19 @@
 import random
 from collections import deque, namedtuple
 from copy import deepcopy
+import itertools
 from functools import partial
 
 import einops
+import gym
+import minerl
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-import minerl
-import gym
+from tqdm import tqdm
 
-from .action_shaping import action_shaping_complex, reverse_action_shaping_complex
+from .action_shaping import action_shaping_complex, reverse_action_shaping_complex, INVENTORY
 from .state_shaping import preprocess_state
 
 Transition = namedtuple('Transition',
@@ -42,7 +44,7 @@ class ReplayBuffer(object):
         Adds all transitions within an episode to the memory.
         '''
         
-        for t in range(len(obs)-self.n_step):
+        for t in tqdm(range(len(obs)-self.n_step)):
             state = self.process_state_fn(obs[t])
             action = self.action_fn(actions[t])[1]
             reward = rewards[t]
@@ -147,7 +149,16 @@ class MemoryDataset(Dataset):
         Wrapper class around combined memory to make it compatible with Dataset and be used by DataLoader
         '''
         self.env_name = env_name
-        action_fn = partial(action_shaping_complex, env_name=env_name)
+        straight_movements = ['forward', 'back']
+        lateral_movements = ['left', 'right']
+        jump = ['jump']
+        attack = ['attack']
+        camera = ['camera_left', 'camera_right', 'camera_up', 'camera_down']
+        equip = [key for key in ['equip_' + item for item in INVENTORY[self.env_name]]]
+        use = ['use']
+        groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
+        all_options = list(itertools.product(*map(lambda x: x+['none'], groups)))
+        action_fn = partial(action_shaping_complex, env_name=env_name, groups=groups, all_options=all_options)
         process_state_fn = partial(preprocess_state, env_name=env_name)
         self.combined_memory = CombinedMemory(agent_memory_capacity, n_step, discount_factor, p_offset, PER_exponent, IS_exponent, action_fn, process_state_fn)
         self.load_expert_demo(env_name, data_dir, num_expert_episodes)
@@ -264,10 +275,19 @@ class RewardActionWrapper(gym.Wrapper):
         self.env_name = env_name
         self.reward_model = reward_model
         self.action_space = gym.spaces.Discrete(11)
+        straight_movements = ['forward', 'back']
+        lateral_movements = ['left', 'right']
+        jump = ['jump']
+        attack = ['attack']
+        camera = ['camera_left', 'camera_right', 'camera_up', 'camera_down']
+        equip = [key for key in ['equip_' + item for item in INVENTORY[self.env_name]]]
+        use = ['use']
+        self.groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
+        self.all_options = list(itertools.product(*map(lambda x: x+['none'], self.groups)))
 
     def step(self, action):
         # translate action to proper action dict
-        new_action = reverse_action_shaping_complex(action, self.env_name)
+        new_action = reverse_action_shaping_complex(action, self.all_options)
 
         next_state, reward, done, info = self.env.step(new_action)
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]

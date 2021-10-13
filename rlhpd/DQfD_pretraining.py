@@ -172,7 +172,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     )
     
     print('Training finished! Saving model...')
-    torch.save(q_net, model_path)
+    torch.save(q_net.state_dict(), model_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
