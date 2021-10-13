@@ -11,6 +11,7 @@ dependencies:
   - einops
   - sk-video
   - streamlit
+  - wandb
   # - cudatoolkit=10.0 # Remove this (put behind the comment line) if not on a GPU machine
   - pip:
     - --index-url https://test.pypi.org/simple/
