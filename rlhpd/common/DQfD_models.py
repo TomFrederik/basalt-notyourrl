@@ -56,6 +56,9 @@ class QNetwork(nn.Module):
 
         return self.q_net(q_net_input)
     
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 class ResBlock(nn.Module):
     def __init__(self, input_channels, channel):

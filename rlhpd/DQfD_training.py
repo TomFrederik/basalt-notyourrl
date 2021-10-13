@@ -25,7 +25,8 @@ def train(
     new_model_path,
     env_name, 
     reward_model,
-    save_freq, 
+    save_freq,
+    max_env_steps, 
     dataset: MemoryDataset, 
     discount_factor, 
     q_net, 
@@ -49,7 +50,7 @@ def train(
     env = RewardActionWrapper(StateWrapper(env, env_name), env_name, reward_model)
     obs = env.reset()
     done = False
-    
+
     steps = 0
     while steps < train_steps:
         steps += 1
@@ -73,6 +74,7 @@ def train(
             
             # take action
             next_obs, reward, done, info = env.step(np.array(action))
+            reward = reward[0]
             estimated_episode_reward += reward
 
             # compute next q values
@@ -110,9 +112,9 @@ def train(
             next_vec = torch.from_numpy(np.array(next_vec)).to(q_net.device)
             #n_step_pov = torch.from_numpy(np.array(n_step_pov))
             #n_step_vec = torch.from_numpy(np.array(n_step_vec))
-            reward = torch.from_numpy(np.array(reward)).to(q_net.device)
-            weights = torch.from_numpy(np.array(weights)).to(q_net.device)
-            expert_mask = torch.from_numpy(np.array(expert_mask)).to(q_net.device)
+            reward = torch.as_tensor(reward).to(q_net.device)
+            weights = torch.as_tensor(weights).to(q_net.device)
+            expert_mask = torch.as_tensor(expert_mask).to(q_net.device)
 
             # compute q values
             q_values = q_net.forward(pov, vec)
@@ -166,23 +168,30 @@ def train(
             
             if steps % save_freq == 0:
                 print('Saving model...')
-                torch.save(q_net, new_model_path)
+                torch.save(q_net.state_dict(), new_model_path)
             
             if steps % update_freq == 0:
                 print('Updating target model...')
                 target_q_net = deepcopy(q_net)
+
+            if steps == max_env_steps:
+                print('Max env steps reached. Terminating episode and saving episode!')
+                torch.save(q_net.state_dict(), new_model_path)
 
             steps += 1
 
         print(f'\nEpisode ended! Estimated reward: {estimated_episode_reward}\n')        
         wandb.log({'Training/Estimated Episode Reward': estimated_episode_reward})
 
+        obs = env.reset()
+        done = False
+
     return q_net
     
 def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_model_path,
-         lr, n_step, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
-         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq, episodic_learning,
-         n_hid, pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim):
+         lr, horizon, agent_memory_capacity, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
+         PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq,
+         n_hid, pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, max_env_steps):
     
     wandb.init(project='DQfD_training')
     
@@ -204,13 +213,13 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
         reward_model = DummyRewardModel()
     else:
         reward_model = RewardModel()
-        reward_model = reward_model.load_state_dict(torch.load(reward_model_path))
-    
+        reward_model.load_state_dict(torch.load(reward_model_path))
+
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
     dataset = MemoryDataset(
         agent_memory_capacity,
-        n_step,
+        horizon,
         discount_factor,
         p_offset,
         PER_exponent,
@@ -247,6 +256,7 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
         env_name,
         reward_model,
         save_freq,
+        max_env_steps,
         dataset,
         discount_factor, 
         q_net,
@@ -260,7 +270,7 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     )
 
     print('Training finished! Saving model...')
-    torch.save(q_net, new_model_path)
+    torch.save(q_net.state_dict(), new_model_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -270,12 +280,12 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--new_model_path', type=str, required=True)
     parser.add_argument('--reward_model_path', type=str, default=None)#, required=True)
-    parser.add_argument('--episodic_learning', action='store_false')
     parser.add_argument('--num_expert_episodes', type=int, default=100)
-    parser.add_argument('--n_step', type=int, default=50)
+    parser.add_argument('--horizon', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--save_freq', type=int, default=100)
     parser.add_argument('--update_freq', type=int, default=100)
+    parser.add_argument('--max_env_steps', type=int, default=10000)
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--epsilon', type=float, default=0.01)
     parser.add_argument('--PER_exponent', type=float, default=0.4, help='PER exponent')
