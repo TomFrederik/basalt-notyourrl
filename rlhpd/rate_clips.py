@@ -67,9 +67,9 @@ class App:
             clip_1 = utils.load_clip_from_file(left_id)
             imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip_1])
             utils.save_vid(imgs, vid_path, self.video_fps)
-            st.write(clip_1[0][0]['equipped_items'])
-            st.write(clip_1[0][0]['inventory'])
-            st.write(str(clip_1[0][0]['vec']))
+            # st.write(clip_1[0][0]['equipped_items'])
+            # st.write(clip_1[0][0]['inventory'])
+            # st.write(str(clip_1[0][0]['vec']))
             with open(vid_path, 'rb') as video_file:
                 video_bytes = video_file.read()
             st.video(video_bytes)
@@ -84,9 +84,9 @@ class App:
             vid_path = self.videos_dir / "right.mp4"
             clip_2 = utils.load_clip_from_file(right_id)
             imgs = np.array([state['pov'] for state, action, reward, next_state, done, meta in clip_2])
-            st.write(clip_2[0][0]['equipped_items'])
-            st.write(clip_2[0][0]['inventory'])
-            st.write(str(clip_2[0][0]['vec']))
+            # st.write(clip_2[0][0]['equipped_items'])
+            # st.write(clip_2[0][0]['inventory'])
+            # st.write(str(clip_2[0][0]['vec']))
             utils.save_vid(imgs, vid_path, self.video_fps)
             with open(vid_path, 'rb') as video_file:
                 video_bytes = video_file.read()

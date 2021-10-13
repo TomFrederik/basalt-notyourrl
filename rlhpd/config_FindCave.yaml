@@ -25,7 +25,7 @@ dqfd_args:
     env_name: MineRLBasaltFindCave-v0
     data_dir: ../data  #TODO -> change this accordingly
     log_dir: ./output
-    num_expert_episodes: 1 # usually less than 100 are available -> takes all episodes
+    num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
     horizon: 50
     batch_size: 100
     save_freq: 100
@@ -42,7 +42,7 @@ dqfd_args:
 
 # args that are special to pretraining
 pretrain_dqfd_args:
-    pretrain_steps: 500 # 10000
+    pretrain_steps: 10000
     model_path: ./output/MineRLBasaltFindCave-v0/Q_0.pth
     n_hid: 64
     vec_feature_dim: 128
@@ -65,7 +65,6 @@ train_dqfd_args:
 
 sampler:
     db_path: ./output/MineRLBasaltFindCave-v0/annotation_buffer.db
-    traj_dir: ./output/MineRLBasaltFindCave-v0/trajectories/
     clips_dir: ./output/MineRLBasaltFindCave-v0/clips/
     rnd_seed: 0
     # All clips
@@ -77,10 +76,6 @@ sampler:
     num_random_clips_per_traj: 50 # 200 * 5 -> 1000
     # Demos
     num_demo_clips: 1000
-    # autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
-    # autolabel_demo_per_sample: 1
-    # autolabel_early_late_demos: False
-    # pair_per_sample: 2
 
 ###########
 # Rating

@@ -17,9 +17,11 @@ from pathlib import Path
 import gym
 import minerl  # This is required to be able to import minerl environments
 import numpy as np
+import torch
 from tqdm import tqdm
 
-from common import database, state_shaping, utils
+from common import database, state_shaping, utils, DQfD_utils
+from common.DQfD_models import QNetwork
 
 
 class DataBaseFiller:
@@ -46,8 +48,6 @@ class DataBaseFiller:
         # All clips
         self.sample_length = cfg.sampler.sample_length
         self.max_pairs_per_autolabel_type = cfg.sampler.max_pairs_per_autolabel_type
-        self.traj_dir = Path(cfg.sampler.traj_dir)
-        self.traj_dir.mkdir(parents=True, exist_ok=True)
         self.clips_dir = Path(cfg.sampler.clips_dir)
         self.clips_dir.mkdir(parents=True, exist_ok=True)
         # Random
@@ -58,33 +58,30 @@ class DataBaseFiller:
         self.num_demo_clips = cfg.sampler.num_demo_clips
         self.demos_dir = Path(cfg.demos_dir)
         self.demos_dir.mkdir(parents=True, exist_ok=True)
-
-        # self.autolabel_with_demos = cfg.sampler.autolabel_with_demos
-        # self.autolabel_demo_num = cfg.sampler.autolabel_demo_per_sample
-        # self.autolabel_early_late_demos = cfg.sampler.autolabel_early_late_demos
-        # self.pair_per_sample = cfg.sampler.pair_per_sample
+        # Q_pre
+        self.q_pre_path = cfg.pretrain_dqfd_args.model_path
 
         self.run_id = time.strftime('%Y%m%d-%H%M%S')
 
-    def _generate_trajectory(self, policy_model=None):
+    def _generate_trajectory(self, policy=None):
         """
-        Generates a trajectory with the given policy_model.
-        Defaults to random policy if policy_model is None.
+        Generates a trajectory with the given policy.
+        Defaults to random policy if policy is None.
         """
         done = False
         observation = self.env.reset()
 
-        trajectory = []
+        trajectory = []            
         for i in range(self.traj_length):
-            if policy_model == None: # Random policy
+            if policy == None: # Random policy
                 action = self.env.action_space.sample() # random policy
             else:
-                action = self.policy_model(observation)
+                action = policy(observation)
             next_observation, reward, done, meta  = self.env.step(action)
             trajectory.append((observation, action, reward, next_observation, done, meta))
 
             observation = next_observation
-            self.env.render()
+            # self.env.render()
             # if done:
             #     break
         return trajectory
@@ -127,12 +124,11 @@ class DataBaseFiller:
                 sample_path = save_dir / f"{self.run_id}_traj_{traj_idx}_smpl_{sample_idx}.pickle"
                 self._write_to_file(sample_path, sample)
 
-    def _generate_demo_clips(self, demo_clips_dir):
+    def _generate_demo_clips(self, save_dir):
         minerl_data = minerl.data.make(self.env_task, data_dir=self.demos_dir)
         traj_names = minerl_data.get_trajectory_names()
 
-        clips_dir = self.clips_dir / "demos"
-        clips_dir.mkdir(parents=True, exist_ok=True)
+        save_dir.mkdir(parents=True, exist_ok=True)
         for i in tqdm(range(self.num_demo_clips)):
             random_traj = np.random.choice(traj_names)
             # minerl_data.load_data is very noisy, we suppress stdout here
@@ -141,17 +137,16 @@ class DataBaseFiller:
             # data_frames == list of (state, action, reward, next_state, done, meta)
 
             clip, start_idx = self._generate_sample(traj_frames, return_start_idx=True)
-            # Insert flattened vector representation of dictionary states
-            # Mimics what the state_shaping.StateWrapper does, but for the demo actions
+            # Mimics what the state_shaping.StateWrapper does, but for the demo states
             for frame in clip:
                 state, action, reward, next_state, done, meta = frame
-                frame[0]['vec'] = state_shaping.preprocess_non_pov_obs(state, cfg.env_task)
+                frame[0] = state_shaping.preprocess_state(state, self.env_task)
 
             # Take note of the clip position within the trajectory; this is useful for
             # autolabelling early/late portions of the trajectory
             normalized_idx = start_idx / (len(traj_frames) - self.sample_length)
-            percent = 100 * normalized_idx
-            demo_path = demo_clips_dir / f"demo_{i:03d}_{random_traj}_{percent:03f}.pickle"
+            percent = int(round(100 * normalized_idx))
+            demo_path = save_dir / f"demo_{i:03d}_{random_traj}_{percent:03d}.pickle"
             self._write_to_file(demo_path, clip)
 
     def _insert_all_pairs_into_db(self, good_paths, bad_paths, shuffle=True, max_pairs=None):
@@ -231,26 +226,50 @@ class DataBaseFiller:
             max_pairs = max_pairs,
         )
 
+    def load_policy(self, model_path):
+        # load model
+        q_net: QNetwork = torch.load(model_path)
+        q_net.eval()
+        return q_net
+
     def run(self):
         random_clips_dir = self.clips_dir / "random"
         demo_clips_dir = self.clips_dir / "demos"
+        q_pre_clips_dir = self.clips_dir / "q_pre"
 
         print("Generating demo clips")
-        #self._generate_policy_clips(random_clips_dir)
+        self._generate_policy_clips(random_clips_dir)
+
         print("Generating random clips")
         self._generate_demo_clips(demo_clips_dir)
-        # print("Generating trained policy clips")
-        # self.policy_model = load_policy(cfg.pretrain_dqfd_args.model_path)
-        # self._generate_policy_clips(policy_name="Q_pre", policy_model=self.policy_model)
+
+        print("Generating Q_pre policy clips")
+        self.q_pre_model = self.load_policy(self.q_pre_path)
+        def q_pre_policy(obs, epsilon=0):
+            # extract pov and inv from obs and convert to torch tensors
+            pov = torch.from_numpy(obs['pov'][None])
+            vec = torch.from_numpy(obs['vec'][None])
+            # compute q_values
+            q_values = self.q_pre_model.forward(pov, vec)
+            # select action
+            if random.random() < epsilon:
+                action = random.randint(0, self.q_pre_model.num_actions)
+            else:
+                action = torch.argmax(q_values).squeeze().item()
+            return action
+        self._generate_policy_clips(q_pre_clips_dir, policy_model=q_pre_policy)
 
         print("Running autolabeling...")
-
         # Random < any demos
         self._populate_db_autolabel_simple(good_dir = demo_clips_dir,
                                            bad_dir = random_clips_dir,
                                            max_pairs=self.max_pairs_per_autolabel_type)
         # Early < Late
         self._populate_db_autolabel_early_late(demo_clips_dir, max_pairs=self.max_pairs_per_autolabel_type)
+        # Q_pre < any demos
+        self._populate_db_autolabel_simple(good_dir = demo_clips_dir,
+                                           bad_dir = q_pre_clips_dir,
+                                           max_pairs=self.max_pairs_per_autolabel_type)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sample clips from pretrained model')
@@ -261,10 +280,11 @@ if __name__ == '__main__':
     # Load config params
     cfg = utils.load_config(options.config_file)
     # Load env
-    env_task = cfg.env_task
-    print(f"Initializing environment {env_task}. This might take a while...")
-    env = gym.make(env_task)
-    env = state_shaping.StateWrapper(env, cfg.env_task)
+    env_name = cfg.env_task
+    print(f"Initializing environment {env_name}. This might take a while...")
+    env = gym.make(env_name)
+    env = state_shaping.StateWrapper(env, env_name)
+    env = DQfD_utils.RewardActionWrapper(env, env_name, DQfD_utils.DummyRewardModel())
     print("Done initializing environment!")
 
     db_filler = DataBaseFiller(cfg=cfg, env=env)
