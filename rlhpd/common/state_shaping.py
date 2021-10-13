@@ -96,7 +96,10 @@ class StateWrapper(gym.ObservationWrapper):
         super().__init__(env)
         self.env = env
         self.env_name = env_name
-        dummy_vec = preprocess_non_pov_obs(self.observation_space.sample(), self.env_name)
+        sample = self.observation_space.sample()
+        sample['equipped_items']['mainhand']['type'] = 'other'
+        print(sample['equipped_items']['mainhand'])
+        dummy_vec = preprocess_non_pov_obs(sample, self.env_name)
         self.observation_space = gym.spaces.Dict({
             'pov':gym.spaces.Box(0, 1, (3,64,64)), 
             'vec':gym.spaces.Box(-np.inf, np.inf, dummy_vec.shape)

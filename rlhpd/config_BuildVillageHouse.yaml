@@ -11,7 +11,7 @@
 env_task: MineRLBasaltBuildVillageHouse-v0
 demos_dir: ../data
 #demos_dir: /home/alex/minerl_data
-wandb_entity: junshern
+wandb_entity: tomfrederik
 
 out:
     base_dir: ./output
