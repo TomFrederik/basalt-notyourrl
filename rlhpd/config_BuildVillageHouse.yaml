@@ -65,7 +65,6 @@ train_dqfd_args:
 
 sampler:
     db_path: ./output/MineRLBasaltBuildVillageHouse-v0/annotation_buffer.db
-    traj_dir: ./output/MineRLBasaltBuildVillageHouse-v0/trajectories/
     clips_dir: ./output/MineRLBasaltBuildVillageHouse-v0/clips/
     rnd_seed: 0
     # All clips
@@ -77,10 +76,6 @@ sampler:
     num_random_clips_per_traj: 50 # 200 * 5 -> 1000
     # Demos
     num_demo_clips: 1000
-    # autolabel_with_demos: True # whether we want to match each trajectory with a demo, and label demos better
-    # autolabel_demo_per_sample: 1
-    # autolabel_early_late_demos: False
-    # pair_per_sample: 2
 
 ###########
 # Rating

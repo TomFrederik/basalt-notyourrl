@@ -91,7 +91,7 @@ def pretrain(
         dataset.update_td_errors(batch_idcs, updated_td_errors)
         
         if steps % save_freq == 0:
-            print('Saving model...')
+            print(f'Saving model to {model_path} ...')
             torch.save(q_net.state_dict(), model_path)
         
         if steps % update_freq == 0:
@@ -172,7 +172,7 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     )
     
     print(f'Training finished! Saving model to {model_path} ...')
-    torch.save(q_net, model_path)
+    torch.save(q_net.state_dict(), model_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

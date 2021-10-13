@@ -34,6 +34,12 @@ def get_frames_and_vec_from_clip(clip: list):
     vec = torch.stack([torch.as_tensor(state['vec'], dtype=torch.float32) for (state, action, reward, next_state, done, meta) in clip], axis=0)
     return frames, vec
 
+def pov_obs_to_img(pov):
+    """
+    Reverses the state shaping: convert from NN-friendly to visualize-friendly
+    """
+    return (einops.rearrange(pov, 'c h w -> h w c') * 255).astype(np.uint8)
+
 def save_vid(imgs, video_path, fps):
     assert len(imgs) > 0
     video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,4 +49,5 @@ def save_vid(imgs, video_path, fps):
         outputdict={'-r': str(fps), '-vcodec': 'libx264'},
         ) as writer:
         for idx in range(imgs.shape[0]):
-            writer.writeFrame(imgs[idx])
+            img = pov_obs_to_img(imgs[idx])
+            writer.writeFrame(img)
