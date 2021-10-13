@@ -6,8 +6,6 @@ import aicrowd_helper
 import gym
 import minerl
 from utility.parser import Parser
-from basalt_baselines.bc import bc_baseline
-
 
 import coloredlogs
 coloredlogs.install(logging.DEBUG)
@@ -80,10 +78,12 @@ def basic_train():
 def main():
     # Documentation for BC Baseline can be found in train_bc.py
     # TODO make this configurable once we have multiple baselines
-    TRAINING_EXPERIMENT = bc_baseline
-    TRAINING_EXPERIMENT.run(config_updates={'data_root': MINERL_DATA_ROOT,
-                                            'task_name': BASALT_GYM_ENV,
-                                            'train_batches': 10,
-                                            'save_dir': "train"})
+    print('Skipping training for now')
+    # TRAINING_EXPERIMENT = bc_baseline
+    # TRAINING_EXPERIMENT.run(config_updates={'data_root': MINERL_DATA_ROOT,
+    #                                         'task_name': BASALT_GYM_ENV,
+    #                                         'train_batches': 10,
+    #                                         'save_dir': "train"})
+
 if __name__ == "__main__":
     main()
