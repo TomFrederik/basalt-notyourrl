@@ -13,9 +13,9 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import wandb
 
-from common.DQfD_utils import MemoryDataset
-from common.DQfD_models import QNetwork
-from common.action_shaping import INVENTORY
+from .common.DQfD_utils import MemoryDataset
+from .common.DQfD_models import QNetwork
+from .common.action_shaping import INVENTORY
 
 def pretrain(
     log_dir, 

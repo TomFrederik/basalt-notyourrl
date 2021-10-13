@@ -20,8 +20,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from common import database, state_shaping, utils, DQfD_utils
-from common.DQfD_models import QNetwork
+from .common import database, state_shaping, utils, DQfD_utils, action_shaping
+from .common.DQfD_models import QNetwork
 
 
 class DataBaseFiller:
@@ -228,9 +228,16 @@ class DataBaseFiller:
 
     def load_policy(self, model_path):
         # load model
-        q_net: QNetwork = torch.load(model_path)
+        vec_sample = self.env.observation_space.sample()['vec']
+        vec_dim = vec_sample.shape[0]
+        print(f'vec_dim = {vec_dim}')
+
+        num_actions = (len(action_shaping.INVENTORY[self.env_task]) + 1) * 360
+        print(f'num_actions = {num_actions}')
+        q_net = QNetwork(num_actions, vec_dim)
+        q_net.load_state_dict(torch.load(model_path))
         q_net.eval()
-        return q_net
+        return q_net 
 
     def run(self):
         random_clips_dir = self.clips_dir / "random"
@@ -271,14 +278,9 @@ class DataBaseFiller:
                                            bad_dir = q_pre_clips_dir,
                                            max_pairs=self.max_pairs_per_autolabel_type)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Sample clips from pretrained model')
-    parser.add_argument("-c", "--config-file", default="config.yaml",
-                        help="Initial config file. Default: %(default)s")
-    options = parser.parse_args()
+    
+def main(cfg):
 
-    # Load config params
-    cfg = utils.load_config(options.config_file)
     # Load env
     env_name = cfg.env_task
     print(f"Initializing environment {env_name}. This might take a while...")
@@ -289,6 +291,16 @@ if __name__ == '__main__':
 
     db_filler = DataBaseFiller(cfg=cfg, env=env)
     db_filler.run()
+    env.close()
 
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Sample clips from pretrained model')
+    parser.add_argument("-c", "--config-file", default="config.yaml",
+                        help="Initial config file. Default: %(default)s")
+    options = parser.parse_args()
     
-
+    # Load config params
+    cfg = utils.load_config(options.config_file)
+    
+    main(cfg)

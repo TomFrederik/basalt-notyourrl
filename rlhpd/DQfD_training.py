@@ -13,11 +13,11 @@ import torch
 from torch.utils.data import Dataset
 import wandb
 
-from common.action_shaping import INVENTORY
-from common.DQfD_models import QNetwork
-from common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
-from common.reward_model import RewardModel
-from common.state_shaping import StateWrapper
+from .common.action_shaping import INVENTORY
+from .common.DQfD_models import QNetwork
+from .common.DQfD_utils import MemoryDataset, loss_function, RewardActionWrapper, DummyRewardModel
+from .common.reward_model import RewardModel
+from .common.state_shaping import StateWrapper
 
 
 def train(

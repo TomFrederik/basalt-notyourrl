@@ -9,7 +9,7 @@
 # print(cfg.out.base_dir)
 
 env_task: MineRLBasaltCreateVillageAnimalPen-v0
-demos_dir: ../data
+demos_dir: ./data
 #demos_dir: /home/alex/minerl_data
 wandb_entity: tomfrederik
 
@@ -20,7 +20,7 @@ wandb_entity: tomfrederik
 # DQfD args that are common to both pretraining and training
 dqfd_args:
     env_name: MineRLBasaltCreateVillageAnimalPen-v0
-    data_dir: ../data  #TODO -> change this accordingly
+    data_dir: ./data  #TODO -> change this accordingly
     log_dir: ./output
     num_expert_episodes: 100 # usually less than 100 are available -> takes all episodes
     horizon: 50
@@ -51,6 +51,7 @@ pretrain_dqfd_args:
 train_dqfd_args:
     agent_memory_capacity: 100000 
     train_steps: 100000
+    max_env_steps: 5000
     model_path: ./output/MineRLBasaltCreateVillageAnimalPen-v0/Q_0.pth
     new_model_path: ./output/MineRLBasaltCreateVillageAnimalPen-v0/Q_1.pth
     reward_model_path: ./output/MineRLBasaltCreateVillageAnimalPen-v0/reward_models/best.pt
