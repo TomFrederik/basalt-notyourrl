@@ -7,6 +7,10 @@ dependencies:
   - nomkl
   - pip
   - py-opencv
+  # NotYourRL custom
+  - einops
+  - sk-video
+  - streamlit
   # - cudatoolkit=10.0 # Remove this (put behind the comment line) if not on a GPU machine
   - pip:
     - --index-url https://test.pypi.org/simple/
