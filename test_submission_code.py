@@ -101,11 +101,11 @@ class MineRLAgent():
         q_net_kwargs = {
             'num_actions':num_actions,
             'vec_dim':vec_dim,
-            'n_hid':self.cfg.pretrain_dqfd_args.n_hid,
-            'pov_feature_dim':self.cfg.pretrain_dqfd_args.pov_feature_dim,
-            'vec_feature_dim':self.cfg.pretrain_dqfd_args.vec_feature_dim,
-            'vec_network_dim':self.cfg.pretrain_dqfd_args.vec_network_dim,
-            'q_net_dim':self.cfg.pretrain_dqfd_args.q_net_dim
+            'n_hid':self.cfg.dqfd_args.n_hid,
+            'pov_feature_dim':self.cfg.dqfd_args.pov_feature_dim,
+            'vec_feature_dim':self.cfg.dqfd_args.vec_feature_dim,
+            'vec_network_dim':self.cfg.dqfd_args.vec_network_dim,
+            'q_net_dim':self.cfg.dqfd_args.q_net_dim
         }
         self.q_net = QNetwork(**q_net_kwargs)
         self.q_net.load_state_dict(th.load(f"train/{self.env_name}.pt", map_location=get_device('auto')))
@@ -124,8 +124,8 @@ class MineRLAgent():
         Args:
             env (gym.Env): The env your agent should interact with.
         """
-        reward_model = RewardModel()
-        reward_model.load_state_dict(th.load(Path(self.cfg.reward.best_model_path), map_location=get_device('auto')))
+        reward_model = RewardModel() # Just a dummy, reward model isn't needed for policy evaluation
+        reward_model.eval()
         wrappers = [(state_shaping.StateWrapper, {'env_name':self.env_name}), (RewardActionWrapper, {"env_name": self.env_name, "reward_model": reward_model})]
         single_episode_env.wrap_env(wrappers)
 
