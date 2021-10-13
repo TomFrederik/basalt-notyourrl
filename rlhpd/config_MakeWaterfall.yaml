@@ -36,25 +36,24 @@ dqfd_args:
     weight_decay: 0.00001
     supervised_loss_margin: 0.8
     discount_factor: 0.99
-
-# args that are special to pretraining
-pretrain_dqfd_args:
-    pretrain_steps: 10000
-    model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
     n_hid: 64
     vec_feature_dim: 128
     vec_network_dim: 128
     pov_feature_dim: 128
     q_net_dim: 128
 
+# args that are special to pretraining
+pretrain_dqfd_args:
+    pretrain_steps: 10000
+    model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
+
 # args that are special to training
 train_dqfd_args:
     agent_memory_capacity: 100000 
     train_steps: 100000
-    action_repeat: 1
     model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
     new_model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_1.pth
-    reward_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_model_0.pth
+    reward_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_models/best.pt
 
 ###########
 # Sampling

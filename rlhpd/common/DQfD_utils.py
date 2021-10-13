@@ -91,8 +91,9 @@ class CombinedMemory(object):
         self._update_weights()
 
     def _update_weights(self):
-        weights = np.array([(sars.td_error + self.memory_dict[key].p_offset) ** self.PER_exponent for key in ['expert', 'agent'] for sars in self.memory_dict[key].memory])
-        #print(weights.shape)
+        expert_weights = np.array([(sars.td_error + self.memory_dict['expert'].p_offset) ** self.PER_exponent for sars in self.memory_dict['expert'].memory])
+        agent_weights = np.array([(sars.td_error + self.memory_dict['agent'].p_offset) ** self.PER_exponent for sars in self.memory_dict['agent'].memory])
+        weights = np.concatenate([expert_weights, agent_weights])
         weights /= np.sum(weights) # = P(i)
         weights = 1 / (len(self) * weights) ** self.IS_exponent
         self.weights = weights / np.max(weights)

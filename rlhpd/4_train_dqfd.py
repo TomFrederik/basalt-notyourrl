@@ -20,8 +20,6 @@ if __name__ == '__main__':
 
     cfg = utils.load_config(options.config_file)
     
-    model_path = Path(cfg.pretrain_dqfd_args.model_path)
-    
-    print("Running DQfD pretraining!")
+    print("Running DQfD training!")
     args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
     main(**args)
