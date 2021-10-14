@@ -18,8 +18,14 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+<<<<<<< HEAD:rlhpd/x_2_run_and_sample_clips.py
 from .common import database, state_shaping, utils, DQfD_utils, action_shaping
 from .common.DQfD_models import QNetwork
+=======
+from common import database, state_shaping, utils, DQfD_utils
+from common.action_shaping import INVENTORY
+from common.DQfD_models import QNetwork
+>>>>>>> tom/running_models:rlhpd/2_run_and_sample_clips.py
 
 
 class DataBaseFiller:
@@ -236,7 +242,11 @@ class DataBaseFiller:
         vec_dim = vec_sample.shape[0]
         print(f'vec_dim = {vec_dim}')
 
+<<<<<<< HEAD:rlhpd/x_2_run_and_sample_clips.py
         num_actions = (len(action_shaping.INVENTORY[self.env_task]) + 1) * 360
+=======
+        num_actions = (len(INVENTORY[self.env_task]) + 1) * 360
+>>>>>>> tom/running_models:rlhpd/2_run_and_sample_clips.py
         print(f'num_actions = {num_actions}')
         q_net = QNetwork(num_actions, vec_dim)
         q_net.load_state_dict(torch.load(model_path))
