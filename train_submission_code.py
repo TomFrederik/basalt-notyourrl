@@ -52,13 +52,14 @@ def main(task_name = None):
         Exception("tag is wrong")
     model_savepath = (Path("train") / cfg.env_task).with_suffix(".pt")
     
+
     # Pretrain
     print("############################## Running DQfD pretraining!")
     args = {**vars(cfg.pretrain_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for pretraining
     DQfD_pretraining.main(**args)
     copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
-
+    
     # Run and sample
     print("############################## Sampling clips")
     x_2_run_and_sample_clips.main(cfg)
