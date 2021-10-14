@@ -285,14 +285,34 @@ class RewardActionWrapper(gym.Wrapper):
         use = ['use']
         self.groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
         self.all_options = list(itertools.product(*map(lambda x: x+['none'], self.groups)))
+        self.equipped_snowball = False
 
     def step(self, action):
         # translate action to proper action dict
         new_action = reverse_action_shaping_complex(action, self.all_options)
 
+        # Don't throw snowball! This tends to end the episode too soon
+        if self.env_name == "MineRLBasaltFindCave-v0":
+            # FindCave starts with snowball in hand, and does not have any other items in inventory
+            # so we just never allow it to "use"
+            new_action['use'] = np.array(0)
+        if self.env_name == "MineRLBasaltMakeWaterfall-v0":
+            # We don't have access to the state, but we can keep track of whenever we take the
+            # "equip snowball" action, and disallow "use" whenever that happens
+            if new_action['equip'] == "snowball":
+                self.equipped_snowball = True
+            elif new_action['equip'] != "snowball" and new_action['equip'] != "none":
+                self.equipped_snowball = False
+
+            if self.equipped_snowball:
+                new_action['use'] = np.array(0)
+
         next_state, reward, done, info = self.env.step(new_action)
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
         reward = reward.detach().cpu().numpy()
+
+        if done:
+            self.equipped_snowball = False
         
         return next_state, reward, done, info
 
