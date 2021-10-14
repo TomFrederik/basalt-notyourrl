@@ -151,6 +151,7 @@ class DataBaseFiller:
             normalized_idx = start_idx / (len(traj_frames) - self.sample_length)
             percent = int(round(100 * normalized_idx))
             demo_path = save_dir / f"demo_{i:03d}_{random_traj}_{percent:03d}.pickle"
+            print(demo_path)
             self._write_to_file(demo_path, clip)
 
     def _insert_all_pairs_into_db(self, good_paths, bad_paths, shuffle=True, max_pairs=None):
@@ -249,10 +250,10 @@ class DataBaseFiller:
         q_pre_clips_dir = self.clips_dir / "q_pre"
 
         print("Generating demo clips")
-        self._generate_policy_clips(random_clips_dir)
+        self._generate_demo_clips(demo_clips_dir)
 
         print("Generating random clips")
-        self._generate_demo_clips(demo_clips_dir)
+        self._generate_policy_clips(random_clips_dir)
 
         print("Generating Q_pre policy clips")
         self.q_pre_model = self.load_policy(self.q_pre_path)
