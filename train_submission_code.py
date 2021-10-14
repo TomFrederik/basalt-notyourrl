@@ -44,7 +44,7 @@ def main(task_name = None):
         cfg = utils.load_config("rlhpd/config_MakeWaterfall.yaml")
     elif task_name == "FindCave":
         cfg = utils.load_config("rlhpd/config_FindCave.yaml")
-    elif task_name == "VillageAnimalPen":
+    elif task_name == "CreateVillageAnimalPen":
         cfg = utils.load_config("rlhpd/config_VillageAnimalPen.yaml")
     elif task_name == "MakeWaterfall_small":
         cfg = utils.load_config("rlhpd/config_MakeWaterfall_small.yaml")
@@ -52,7 +52,6 @@ def main(task_name = None):
         Exception("tag is wrong")
     model_savepath = (Path("train") / cfg.env_task).with_suffix(".pt")
     
-
     # Pretrain
     print("############################## Running DQfD pretraining!")
     args = {**vars(cfg.pretrain_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for pretraining
@@ -63,7 +62,6 @@ def main(task_name = None):
     # Run and sample
     print("############################## Sampling clips")
     x_2_run_and_sample_clips.main(cfg)
-
     # Train reward
     print("############################## Training reward!")
     x_3_train_reward.main(cfg)
@@ -71,6 +69,7 @@ def main(task_name = None):
     # Train DQfD
     print("############################## Running DQfD training!")
     args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
+    args['num_expert_episodes'] = 1 #TODO --> delete this
     DQfD_training.main(**args)
     copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
     print(f"Copied {cfg.train_dqfd_args.new_model_path} to {model_savepath}")

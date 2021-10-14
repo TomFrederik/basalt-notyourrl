@@ -15,7 +15,7 @@ class RewardModel(nn.Module):
     - Conv layers have per-channel dropout (Srivastava et al., 2014) with α = 0.8.
     """
 
-    def __init__(self):
+    def __init__(self, vec_size):
         super().__init__()
         # pov feature extractor
         # 64x64
@@ -24,7 +24,6 @@ class RewardModel(nn.Module):
         dropout_rate = 0.2
         conv_out_size = 64
         # TODO: vec_size == vec.shape[1] (This needs to adapted for each environment)
-        vec_size = 27 # findCave
         self.conv = nn.Sequential(
             nn.Conv2d(3, channel, 7, stride=3),
             nn.BatchNorm2d(channel),

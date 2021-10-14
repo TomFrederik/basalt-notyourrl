@@ -65,8 +65,9 @@ def main(cfg):
     save_dir.mkdir(parents=True, exist_ok=True)
 
     utils.set_seeds(cfg.reward.rand_seed)
-
-    reward_model = RewardModel()
+    
+    vec_size = 63 if cfg.env_task == 'MineRLBuildVillageHouse-v0' else 27
+    reward_model = RewardModel(vec_size)
     wandb.watch(reward_model)
     optimizer = torch.optim.Adam(
         reward_model.parameters(),
