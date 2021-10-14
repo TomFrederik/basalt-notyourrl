@@ -87,7 +87,6 @@ rate_ui:
 ###########
 
 reward:
-    wandb_project: 4-train-reward
     save_dir: ./output/MineRLBasaltMakeWaterfall-v0/reward_models
     best_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_models/best.pt
     # Training params

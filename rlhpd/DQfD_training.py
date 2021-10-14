@@ -193,7 +193,10 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, update_freq,
          n_hid, pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, max_env_steps):
     
-    wandb.init(project='DQfD_training')
+    wandb.init(
+        project=f'DQfD_training_{env_name}',
+        # mode="disabled",
+        )
     
     if reward_model_path is None:
         print('\nWARNING!: DummyRewardModel will be used! If you are not currently debugging, you should change that!\n')
