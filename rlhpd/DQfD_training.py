@@ -51,6 +51,8 @@ def train(
     obs = env.reset()
     done = False
 
+    print('\n\n\n\nEnv reset.. Starting training\n\n\n\n')
+
     steps = 0
     while steps < train_steps:
         steps += 1
@@ -211,12 +213,6 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
 
-    # load reward model
-    if reward_model_path is None:
-        reward_model = DummyRewardModel()
-    else:
-        reward_model = RewardModel()
-        reward_model.load_state_dict(torch.load(reward_model_path))
 
     # init dataset
     p_offset=dict(expert=expert_p_offset, agent=agent_p_offset)
@@ -237,6 +233,13 @@ def main(env_name, train_steps, save_freq, model_path, new_model_path, reward_mo
     vec_sample = dataset[0][0][1]
     vec_dim = vec_sample.shape[0]
     print(f'vec_dim = {vec_dim}')
+   
+    # load reward model
+    if reward_model_path is None:
+        reward_model = DummyRewardModel()
+    else:
+        reward_model = RewardModel(vec_dim)
+        reward_model.load_state_dict(torch.load(reward_model_path))
 
     num_actions = (len(INVENTORY[env_name]) + 1) * 360
     print(f'num_actions = {num_actions}')
