@@ -57,11 +57,7 @@ def main(cfg):
 
     wandb.init(
         project=f"reward_training_{cfg.env_task}",
-<<<<<<< HEAD:rlhpd/x_3_train_reward.py
         # mode="disabled",
-=======
-        #mode="disabled",
->>>>>>> tom/running_models:rlhpd/3_train_reward.py
         tags=['basalt']
         )
 
