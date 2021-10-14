@@ -59,6 +59,11 @@ def main(task_name = None):
     copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
 
+    if task_name == "FindCave":
+        # We exit early for FindCave
+        print(f"Training for {task_name} ran successfully!")
+        return
+
     # Run and sample
     print("############################## Sampling clips")
     x_2_run_and_sample_clips.main(cfg)
