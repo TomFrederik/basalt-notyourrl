@@ -21,6 +21,7 @@ import torch
 from tqdm import tqdm
 
 from common import database, state_shaping, utils, DQfD_utils
+from common.action_shaping import INVENTORY
 from common.DQfD_models import QNetwork
 
 
@@ -228,7 +229,14 @@ class DataBaseFiller:
 
     def load_policy(self, model_path):
         # load model
-        q_net: QNetwork = torch.load(model_path)
+        vec_sample = self.env.observation_space.sample()['vec']
+        vec_dim = vec_sample.shape[0]
+        print(f'vec_dim = {vec_dim}')
+
+        num_actions = (len(INVENTORY[self.env_task]) + 1) * 360
+        print(f'num_actions = {num_actions}')
+        q_net = QNetwork(num_actions, vec_dim)
+        q_net.load_state_dict(torch.load(model_path))
         q_net.eval()
         return q_net
 

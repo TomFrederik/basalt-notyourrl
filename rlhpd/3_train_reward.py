@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     wandb.init(
         project=f"reward_training_{cfg.env_task}",
-        mode="disabled",
+        #mode="disabled",
         tags=['basalt']
         )
 
