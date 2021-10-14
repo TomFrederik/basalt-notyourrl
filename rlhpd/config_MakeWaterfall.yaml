@@ -22,7 +22,7 @@ dqfd_args:
     env_name: MineRLBasaltMakeWaterfall-v0
     data_dir: ./data  #TODO -> change this accordingly
     log_dir: ./output
-    num_expert_episodes: 40 # usually less than 100 are available -> takes all episodes
+    num_expert_episodes: 30 # usually less than 100 are available -> takes all episodes
     horizon: 50
     batch_size: 100
     save_freq: 100
@@ -87,12 +87,11 @@ rate_ui:
 ###########
 
 reward:
-    wandb_project: 4-train-reward
     save_dir: ./output/MineRLBasaltMakeWaterfall-v0/reward_models
     best_model_path: ./output/MineRLBasaltMakeWaterfall-v0/reward_models/best.pt
     # Training params
     rand_seed: 1
-    max_num_pairs: 100000
+    max_num_pairs: 25000
     val_split: 0.05
     val_every_n_batch: 100
     save_every_n_batch: 500
