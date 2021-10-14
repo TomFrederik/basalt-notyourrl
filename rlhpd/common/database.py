@@ -48,7 +48,7 @@ class AnnotationBuffer:
                     traj_tuples[i][2] = 2
                 elif pref == 2:
                     traj_tuples[i][2] = 1
-        self.c.executemany(''' INSERT INTO trajectories (left_id, right_id, preference) VALUES(?, ?, ?) ''', traj_tuples)
+        self.c.executemany(''' INSERT OR REPLACE INTO trajectories (left_id, right_id, preference) VALUES(?, ?, ?) ''', traj_tuples)
         self.conn.commit()
 
     def insert_traj_pair(self, left_id:str, right_id:str, pref=0): 
