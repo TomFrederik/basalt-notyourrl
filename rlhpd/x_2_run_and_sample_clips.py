@@ -6,9 +6,7 @@ Add clips (unannotated) into annotation db
 """
 
 import argparse
-import contextlib
 import itertools
-import os
 import pickle
 import random
 import time
@@ -63,28 +61,34 @@ class DataBaseFiller:
 
         self.run_id = time.strftime('%Y%m%d-%H%M%S')
 
-    def _generate_trajectory(self, policy=None):
+    def _generate_trajectory(self, policy=None, max_attempts=10):
         """
         Generates a trajectory with the given policy.
         Defaults to random policy if policy is None.
+        Note: The trajectory may end prematurely depending on the policy actions.
+        If the trajectory ends with fewer than sample_length frames, we try again
+        up to max_attempts.
         """
-        done = False
-        observation = self.env.reset()
 
-        trajectory = []            
-        for i in range(self.traj_length):
-            if policy == None: # Random policy
-                action = self.env.action_space.sample() # random policy
-            else:
-                action = policy(observation)
-            next_observation, reward, done, meta  = self.env.step(action)
-            trajectory.append((observation, action, reward, next_observation, done, meta))
+        for _ in range(max_attempts):
+            observation = self.env.reset()
+            done = False
+            trajectory = []
+            for _ in range(self.traj_length):
+                if policy == None: # Random policy
+                    action = self.env.action_space.sample() # random policy
+                else:
+                    action = policy(observation)
+                next_observation, reward, done, meta  = self.env.step(action)
+                trajectory.append((observation, action, reward, next_observation, done, meta))
 
-            observation = next_observation
-            # self.env.render()
-            # if done:
-            #     break
-        return trajectory
+                observation = next_observation
+                # self.env.render()
+                if done:
+                    break
+            if len(trajectory) > self.sample_length:
+                return trajectory
+        raise Exception(f"Exceeded max attempts({max_attempts}) to generate trajectory of length {self.sample_length}")
 
     def _generate_sample(self, trajectory, return_start_idx=False):
         """ 
