@@ -1,7 +1,7 @@
 import logging
 import os
+import shutil
 from pathlib import Path
-from shutil import copyfile
 
 import coloredlogs
 import gym
@@ -56,12 +56,18 @@ def main(task_name = None):
     print("############################## Running DQfD pretraining!")
     args = {**vars(cfg.pretrain_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for pretraining
     DQfD_pretraining.main(**args)
-    copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
+    shutil.copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
-    
+
+    if task_name == "FindCave":
+        # We exit early for FindCave
+        print(f"Training for {task_name} ran successfully!")
+        return
+
     # Run and sample
     print("############################## Sampling clips")
     x_2_run_and_sample_clips.main(cfg)
+
     # Train reward
     print("############################## Training reward!")
     x_3_train_reward.main(cfg)
@@ -69,10 +75,42 @@ def main(task_name = None):
     # Train DQfD
     print("############################## Running DQfD training!")
     args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
-    args['num_expert_episodes'] = 1 #TODO --> delete this
     DQfD_training.main(**args)
-    copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
+    shutil.copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
     print(f"Copied {cfg.train_dqfd_args.new_model_path} to {model_savepath}")
+
+    # # Advanced: Keep looping
+    # for i in range(cfg.num_big_loops):
+        
+    #     # Prep for new run
+    #     def add_number_to_path_stem(filepath: str, num: int):
+    #         """
+    #         Converts a filepath like
+    #         path/to/my/file.suffix into 
+    #         path/to/my/file_001.suffix
+    #         """
+    #         return str(Path(filepath).parent / Path(filepath).stem) + f"_{num:03d}.pt"
+    #     # Add counter to each of the model paths
+    #     cfg.pretrain_dqfd_args.model_path = add_number_to_path_stem(cfg.pretrain_dqfd_args.model_path, i)
+    #     cfg.train_dqfd_args.model_path = add_number_to_path_stem(cfg.train_dqfd_args.model_path, i)
+    #     cfg.train_dqfd_args.new_model_path = add_number_to_path_stem(cfg.train_dqfd_args.new_model_path, i)
+    #     shutil.rmtree(cfg.sampler.db_path)
+    #     shutil.rmtree(cfg.sampler.clips_dir)
+
+    #     # Run and sample
+    #     print(f"############################## Sampling clips {i+1}")
+    #     x_2_run_and_sample_clips.main(cfg)
+
+    #     # Train reward
+    #     print(f"############################## Training reward! {i+1}")
+    #     x_3_train_reward.main(cfg)
+
+    #     # Train DQfD
+    #     print(f"############################## Running DQfD training! {i+1}")
+    #     args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
+    #     DQfD_training.main(**args)
+    #     shutil.copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
+    #     print(f"Copied {cfg.train_dqfd_args.new_model_path} to {model_savepath}")
 
     print(f"Training for {task_name} ran successfully!")
 
