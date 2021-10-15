@@ -115,7 +115,7 @@ def main(env_name, pretrain_steps, save_freq, model_path, load_from_checkpoint,
     )
     wandb.init(
         project=f"DQfD_pretraining_{env_name}",
-        # mode="disabled",
+        mode="disabled", # for submission to aicrowd
         tags=['basalt'],
         config=config
     )

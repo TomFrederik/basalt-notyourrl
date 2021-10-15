@@ -135,9 +135,9 @@ class MineRLAgent():
             pov = th.from_numpy(pov.copy())[None].to(get_device('auto'))
             vec = th.from_numpy(vec.copy())[None].to(get_device('auto'))
             q_values = self.q_net.forward(pov, vec)
-            q_action = th.argmax(q_values).item()
+            q_action = th.argmax(q_values).squeeze().item()
             try:
-                obs, reward, done, _ = single_episode_env.step(np.array(q_action))
+                obs, reward, done, _ = single_episode_env.step(q_action)
             except EpisodeDone:
                 done = True
                 continue

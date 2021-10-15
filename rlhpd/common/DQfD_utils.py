@@ -274,6 +274,8 @@ class RewardActionWrapper(gym.Wrapper):
         super().__init__(env)
         self.env = env
         self.env_name = env_name
+        print(f'{self.env_name = }')
+
         self.reward_model = reward_model
         self.action_space = gym.spaces.Discrete(11)
         straight_movements = ['forward', 'back']
@@ -337,7 +339,37 @@ class RewardActionWrapper(gym.Wrapper):
             # Encourage more "using"
             if random.random() < 0.2:
                 new_action['use'] = np.array(1)
+        
+        if self.env_name == 'MineRLBasaltCreateVillageAnimalPen-v0':
+            # Disable attacking!
+            new_action['attack'] = np.array(0)
+            
+            # Replace the original choice of equipment with our curated set of objects
+            if new_action['equip'] != "none":
+                new_action['equip'] = np.random.choice([
+                    "fence",
+                    "fence_gate",
+                    new_action['equip']
+                ], p=[0.8, 0.1, 0.1])
+                print("Equipped", new_action['equip'])
+            
+            #elif random.random() < 
 
+            # # Turn harder!
+            # new_action['camera'] *= 10
+            # new_action['camera'][0] = 180
+            # Turn around more
+            if random.random() < 0.01:
+                # Pitch rotation (Prefer looking down than looking up)
+                new_action['camera'][0] = np.random.choice([-15., 30.])
+                # Yaw rotation
+                new_action['camera'][1] = np.random.choice([-30., 30.])
+            # new_action['camera'][0] = np.clip(new_action['camera'][0], -180, 30)
+
+            # Encourage more "using"
+            if random.random() < 0.3:
+                new_action['use'] = np.array(1)
+        
         next_state, reward, done, info = self.env.step(new_action)
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
         reward = reward.detach().cpu().numpy()
