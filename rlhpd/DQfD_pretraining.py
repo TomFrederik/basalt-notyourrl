@@ -100,16 +100,25 @@ def pretrain(
             
     return q_net
 
-def main(env_name, pretrain_steps, save_freq, model_path,
+def main(env_name, pretrain_steps, save_freq, model_path, load_from_checkpoint,
          lr, horizon, discount_factor, epsilon, batch_size, num_expert_episodes, data_dir, log_dir,
          PER_exponent, IS_exponent_0, agent_p_offset, expert_p_offset, weight_decay, supervised_loss_margin, n_hid, 
          pov_feature_dim, vec_network_dim, vec_feature_dim, q_net_dim, update_freq):
     
+    config = dict(
+        load_from_checkpoint=load_from_checkpoint,
+        n_hid=n_hid,
+        q_net_dim=q_net_dim,
+        pov_feature_dim=pov_feature_dim,
+        vec_feature_dim=vec_feature_dim,
+        supervised_loss_margin=supervised_loss_margin
+    )
     wandb.init(
         project=f"DQfD_pretraining_{env_name}",
         # mode="disabled",
-        tags=['basalt']
-        )
+        tags=['basalt'],
+        config=config
+    )
     
     # set save dir
     # TODO: change log_dir to a single indentifier (no time, but maybe model version?)
@@ -119,6 +128,15 @@ def main(env_name, pretrain_steps, save_freq, model_path,
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(os.path.dirname(model_path), exist_ok=True) # TODO make this prettier
     
+    if load_from_checkpoint:
+        print(f'\nLoading model from {model_path}')
+        new_model_path = model_path[:-4] + '_new.pth'
+    else:
+        new_model_path = model_path
+
+    print(f'\nModel will be saved to {new_model_path}\n')
+
+
     # set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
@@ -154,11 +172,13 @@ def main(env_name, pretrain_steps, save_freq, model_path,
         'q_net_dim':q_net_dim
     }
     q_net = QNetwork(**q_net_kwargs)
+    if load_from_checkpoint:
+        q_net.load_state_dict(torch.load(model_path))
     
     # launch pretraining
     q_net = pretrain(
         log_dir,
-        model_path,
+        new_model_path,
         save_freq,
         dataset,
         discount_factor, 
@@ -179,6 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--env_name', default='MineRLBasaltFindCave-v0')
     parser.add_argument('--log_dir', default='/home/lieberummaas/datadisk/basalt-notyourrl/run_logs')
     parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--load_from_checkpoint', action='store_true')
     parser.add_argument('--data_dir', default='/home/lieberummaas/datadisk/minerl/data')
     parser.add_argument('--num_expert_episodes', type=int, default=10)
     parser.add_argument('--horizon', type=int, default=50)

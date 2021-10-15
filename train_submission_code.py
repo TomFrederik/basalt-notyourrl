@@ -55,6 +55,8 @@ def main(task_name = None):
     # Pretrain
     print("############################## Running DQfD pretraining!")
     args = {**vars(cfg.pretrain_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for pretraining
+    #args['load_from_checkpoint'] = True
+    #args['pretrain_steps'] = 100000
     DQfD_pretraining.main(**args)
     shutil.copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
