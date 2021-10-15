@@ -44,7 +44,7 @@ dqfd_args:
 
 # args that are special to pretraining
 pretrain_dqfd_args:
-    pretrain_steps: 10000
+    pretrain_steps: 30000
     model_path: ./output/MineRLBasaltMakeWaterfall-v0/Q_0.pth
 
 # args that are special to training

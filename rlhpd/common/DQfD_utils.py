@@ -274,7 +274,7 @@ class RewardActionWrapper(gym.Wrapper):
         super().__init__(env)
         self.env = env
         self.env_name = env_name
-        print(f'{self.env_name = }')
+        print(f'self.env_name = {self.env_name}')
 
         self.reward_model = reward_model
         straight_movements = ['forward', 'back']
