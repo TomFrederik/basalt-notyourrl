@@ -291,12 +291,14 @@ class RewardActionWrapper(gym.Wrapper):
         # translate action to proper action dict
         new_action = reverse_action_shaping_complex(action, self.all_options)
 
-        # Don't throw snowball! This tends to end the episode too soon
         if self.env_name == "MineRLBasaltFindCave-v0":
+            # Don't throw snowball! This tends to end the episode too soon
             # FindCave starts with snowball in hand, and does not have any other items in inventory
             # so we just never allow it to "use"
             new_action['use'] = np.array(0)
+
         if self.env_name == "MineRLBasaltMakeWaterfall-v0":
+            # Don't throw snowball! This tends to end the episode too soon
             # We don't have access to the state, but we can keep track of whenever we take the
             # "equip snowball" action, and disallow "use" whenever that happens
             if new_action['equip'] == "snowball":
@@ -307,11 +309,41 @@ class RewardActionWrapper(gym.Wrapper):
             if self.equipped_snowball:
                 new_action['use'] = np.array(0)
 
+        if self.env_name == "MineRLBasaltBuildVillageHouse-v0":
+            # Disable attacking!
+            new_action['attack'] = np.array(0)
+
+            # Replace the original choice of equipment with our curated set of objects
+            if new_action['equip'] != "none":
+                new_action['equip'] = np.random.choice([
+                    "cobblestone",
+                    "glass",
+                    "wooden_door",
+                    new_action['equip']
+                ], p=[0.6, 0.1, 0.1, 0.2])
+                print("Equipped", new_action['equip'])
+            
+            # # Turn harder!
+            # new_action['camera'] *= 10
+            # new_action['camera'][0] = 180
+            # Turn around more
+            if random.random() < 0.01:
+                # Pitch rotation (Prefer looking down than looking up)
+                new_action['camera'][0] = np.random.choice([-15., 30.])
+                # Yaw rotation
+                new_action['camera'][1] = np.random.choice([-30., 30.])
+            # new_action['camera'][0] = np.clip(new_action['camera'][0], -180, 30)
+
+            # Encourage more "using"
+            if random.random() < 0.2:
+                new_action['use'] = np.array(1)
+
         next_state, reward, done, info = self.env.step(new_action)
         reward = self.reward_model(torch.from_numpy(next_state['pov'])[None], torch.from_numpy(next_state['vec'])[None])[0]
         reward = reward.detach().cpu().numpy()
 
         if done:
+            # TODO: This doesn't actually work! How do I reset on each episode?
             self.equipped_snowball = False
         
         return next_state, reward, done, info

@@ -59,7 +59,7 @@ def main(task_name = None):
     shutil.copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
 
-    if task_name == "FindCave":
+    if task_name == "FindCave" or task_name == "BuildVillageHouse":
         # We exit early for FindCave
         print(f"Training for {task_name} ran successfully!")
         return
