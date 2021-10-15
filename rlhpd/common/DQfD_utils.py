@@ -277,7 +277,6 @@ class RewardActionWrapper(gym.Wrapper):
         print(f'{self.env_name = }')
 
         self.reward_model = reward_model
-        self.action_space = gym.spaces.Discrete(11)
         straight_movements = ['forward', 'back']
         lateral_movements = ['left', 'right']
         jump = ['jump']
@@ -287,6 +286,7 @@ class RewardActionWrapper(gym.Wrapper):
         use = ['use']
         self.groups = [straight_movements, lateral_movements, jump, attack, camera, equip, use]
         self.all_options = list(itertools.product(*map(lambda x: x+['none'], self.groups)))
+        self.action_space = gym.spaces.Discrete(len(self.all_options))
         self.equipped_snowball = False
 
     def step(self, action):
