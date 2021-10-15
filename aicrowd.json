@@ -1,7 +1,7 @@
 {
   "challenge_id": "neurips-2021-minerl-basalt-competition",
   "authors": ["jun_shern_chan", "gabbro", "Alexfrs", "tom4", "alexandra_souly"],
-  "description": "CreateAnimalPen-Q0_new",
+  "description": "CreateAnimalPen-Q0-post",
   "tags": "CreateVillageAnimalPen",
   "gpu": true
 }
