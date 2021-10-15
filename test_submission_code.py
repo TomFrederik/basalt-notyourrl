@@ -85,7 +85,7 @@ class MineRLAgent():
             self.cfg = utils.load_config("rlhpd/config_MakeWaterfall.yaml")
         elif ai_crowd_json["tags"] == "FindCave":
             self.cfg = utils.load_config("rlhpd/config_FindCave.yaml")
-        elif ai_crowd_json["tags"] == "VillageAnimalPen":
+        elif ai_crowd_json["tags"] == "CreateVillageAnimalPen":
             self.cfg = utils.load_config("rlhpd/config_VillageAnimalPen.yaml")
         else: 
             Exception("tag is wrong")
