@@ -1,4 +1,5 @@
 import gym
+import random
 import torch as th
 #from basalt_utils import sb3_compat
 #from basalt_baselines.bc import bc_baseline, WRAPPERS as bc_wrappers
@@ -112,7 +113,7 @@ class MineRLAgent():
         self.q_net = self.q_net.to(get_device('auto'))
         self.q_net.eval()
 
-    def run_agent_on_episode(self, single_episode_env: Episode):
+    def run_agent_on_episode(self, single_episode_env: Episode, epsilon=0.02):
         """This method runs your agent on a SINGLE episode.
 
         You should just implement the standard environment interaction loop here:
@@ -135,7 +136,11 @@ class MineRLAgent():
             pov = th.from_numpy(pov.copy())[None].to(get_device('auto'))
             vec = th.from_numpy(vec.copy())[None].to(get_device('auto'))
             q_values = self.q_net.forward(pov, vec)
-            q_action = th.argmax(q_values).squeeze().item()
+            # select action
+            if random.random() < epsilon:
+                q_action = random.randint(0, self.q_net.num_actions)
+            else:
+                q_action = th.argmax(q_values).squeeze().item()
             try:
                 obs, reward, done, _ = single_episode_env.step(q_action)
             except EpisodeDone:
