@@ -56,30 +56,30 @@ def main(task_name = None):
     print("############################## Running DQfD pretraining!")
     args = {**vars(cfg.pretrain_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for pretraining
     #args['load_from_checkpoint'] = True
-    #args['pretrain_steps'] = 100000
+    args['pretrain_steps'] = 100000
     DQfD_pretraining.main(**args)
     shutil.copyfile(cfg.pretrain_dqfd_args.model_path, model_savepath)
     print(f"Copied {cfg.pretrain_dqfd_args.model_path} to {model_savepath}")
 
-    if task_name == "FindCave":
-        # We exit early for FindCave
-        print(f"Training for {task_name} ran successfully!")
-        return
+    # if task_name == "FindCave":
+    #     # We exit early for FindCave
+    #     print(f"Training for {task_name} ran successfully!")
+    #     return
 
-    # Run and sample
-    print("############################## Sampling clips")
-    x_2_run_and_sample_clips.main(cfg)
+    # # Run and sample
+    # print("############################## Sampling clips")
+    # x_2_run_and_sample_clips.main(cfg)
 
-    # Train reward
-    print("############################## Training reward!")
-    x_3_train_reward.main(cfg)
+    # # Train reward
+    # print("############################## Training reward!")
+    # x_3_train_reward.main(cfg)
 
-    # Train DQfD
-    print("############################## Running DQfD training!")
-    args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
-    DQfD_training.main(**args)
-    shutil.copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
-    print(f"Copied {cfg.train_dqfd_args.new_model_path} to {model_savepath}")
+    # # Train DQfD
+    # print("############################## Running DQfD training!")
+    # args = {**vars(cfg.train_dqfd_args), **vars(cfg.dqfd_args)} # join common dqfd args with those that are specific for training
+    # DQfD_training.main(**args)
+    # shutil.copyfile(cfg.train_dqfd_args.new_model_path, model_savepath)
+    # print(f"Copied {cfg.train_dqfd_args.new_model_path} to {model_savepath}")
 
     # # Advanced: Keep looping
     # for i in range(cfg.num_big_loops):
