@@ -11,7 +11,7 @@ from pathlib import Path
 from rlhpd.common import state_shaping, utils
 from rlhpd.common.action_shaping import INVENTORY
 from rlhpd.common.DQfD_models import QNetwork
-from rlhpd.common.DQfD_utils import RewardActionWrapper
+from rlhpd.common.DQfD_utils import RewardActionWrapper, DummyRewardModel
 from rlhpd.common.reward_model import RewardModel
 
 # TODO:
@@ -124,8 +124,7 @@ class MineRLAgent():
         Args:
             env (gym.Env): The env your agent should interact with.
         """
-        reward_model = RewardModel() # Just a dummy, reward model isn't needed for policy evaluation
-        reward_model.eval()
+        reward_model = DummyRewardModel() # Just a dummy, reward model isn't needed for policy evaluation
         wrappers = [(state_shaping.StateWrapper, {'env_name':self.env_name}), (RewardActionWrapper, {"env_name": self.env_name, "reward_model": reward_model})]
         single_episode_env.wrap_env(wrappers)
 
