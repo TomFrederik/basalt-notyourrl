@@ -50,7 +50,7 @@ pretrain_dqfd_args:
 # args that are special to training
 train_dqfd_args:
     agent_memory_capacity: 100000 
-    train_steps: 10000
+    train_steps: 30000
     max_env_steps: 5000
     model_path: ./output/MineRLBasaltCreateVillageAnimalPen-v0/Q_0.pth
     new_model_path: ./output/MineRLBasaltCreateVillageAnimalPen-v0/Q_1.pth

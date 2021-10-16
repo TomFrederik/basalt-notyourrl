@@ -138,7 +138,7 @@ class MineRLAgent():
             q_values = self.q_net.forward(pov, vec)
             # select action
             if random.random() < epsilon:
-                q_action = random.randint(0, self.q_net.num_actions)
+                q_action = random.randint(0, self.q_net.num_actions-1)
             else:
                 q_action = th.argmax(q_values).squeeze().item()
             try:
