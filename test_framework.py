@@ -5,11 +5,11 @@ import gym
 import atexit
 import threading
 import minerl
-from basalt_baselines.bc import bc_baseline, WRAPPERS as bc_wrappers
+#from basalt_baselines.bc import bc_baseline, WRAPPERS as bc_wrappers
 import numpy as np
-from test_submission_code import MineRLAgent, Episode, EpisodeDone, MineRLBehavioralCloningAgent
+from test_submission_code import MineRLAgent, Episode, EpisodeDone
 from minerl.herobraine.wrappers import downscale_wrapper
-from basalt_utils.utils import wrap_env
+#from basalt_utils.utils import wrap_env
 import torch as th
 # import coloredlogs
 #coloredlogs.install(logging.DEBUG)
@@ -26,7 +26,7 @@ EVALUATION_THREAD_COUNT = 1
 
 
 def main():
-    agent = MineRLBehavioralCloningAgent()
+    agent = MineRLAgent()
     agent.load_agent()
 
     assert MINERL_MAX_EVALUATION_EPISODES > 0

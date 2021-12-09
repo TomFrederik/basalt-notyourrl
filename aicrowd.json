@@ -1,7 +1,7 @@
 {
   "challenge_id": "neurips-2021-minerl-basalt-competition",
-  "authors": ["aicrowd-bot"],
-  "description": "Test Model for MineRL BASALT Challenge",
-  "tags": "CreateVillageAnimalPen",
-  "gpu": false
+  "authors": ["jun_shern_chan", "gabbro", "Alexfrs", "tom4", "alexandra_souly"],
+  "description": "Submit to AIcrowd",
+  "tags": "FindCave",
+  "gpu": true
 }

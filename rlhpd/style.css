@@ -1,0 +1,8 @@
+.stButton {
+    display: flex;
+    justify-content: center;
+}
+
+.stVideo {
+    width: 300px;
+}

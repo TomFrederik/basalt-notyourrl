@@ -1,0 +1,106 @@
+# This is a central config file to store all configuration parameters for RLHPD.
+
+# Example usage:
+# from common import utils
+# cfg = utils.load_config("config.yaml")
+# # Returns a Munch file which is a dictionary-like object that supports
+# # attribute-style access (object.attribute.path)
+# # See: https://github.com/Infinidat/munch
+# print(cfg.out.base_dir)
+
+env_task: MineRLBasaltBuildVillageHouse-v0
+demos_dir: ./data
+#demos_dir: /home/alex/minerl_data
+wandb_entity: tomfrederik
+
+##########
+# DQfD
+##########
+
+# DQfD args that are common to both pretraining and training
+dqfd_args:
+    env_name: MineRLBasaltBuildVillageHouse-v0
+    data_dir: ./data  #TODO -> change this accordingly
+    log_dir: ./output
+    num_expert_episodes: 40 # usually less than 100 are available -> takes all episodes
+    horizon: 50
+    batch_size: 100
+    save_freq: 100
+    update_freq: 100
+    lr: 0.0003
+    epsilon: 0.01
+    PER_exponent: 0.4
+    IS_exponent_0: 0.6
+    agent_p_offset:  0.001
+    expert_p_offset: 1
+    weight_decay: 0.00001
+    supervised_loss_margin: 0.8
+    discount_factor: 0.99
+    n_hid: 64
+    vec_feature_dim: 128
+    vec_network_dim: 128
+    pov_feature_dim: 128
+    q_net_dim: 128
+
+# args that are special to pretraining
+pretrain_dqfd_args:
+    pretrain_steps: 30000
+    model_path: ./output/MineRLBasaltBuildVillageHouse-v0/Q_0.pth
+
+# args that are special to training
+train_dqfd_args:
+    agent_memory_capacity: 100000 
+    train_steps: 10000
+    max_env_steps: 5000
+    model_path: ./output/MineRLBasaltBuildVillageHouse-v0/Q_0.pth
+    new_model_path: ./output/MineRLBasaltBuildVillageHouse-v0/Q_1.pth
+    reward_model_path: ./output/MineRLBasaltBuildVillageHouse-v0/reward_models/best.pt
+
+###########
+# Sampling
+###########
+
+sampler:
+    db_path: ./output/MineRLBasaltBuildVillageHouse-v0/annotation_buffer.db
+    clips_dir: ./output/MineRLBasaltBuildVillageHouse-v0/clips/
+    rnd_seed: 0
+    # All clips
+    sample_length: 20
+    max_pairs_per_autolabel_type: 100000
+    # Random
+    num_traj: 20
+    traj_length: 1000
+    num_random_clips_per_traj: 50 # 200 * 5 -> 1000
+    # Demos
+    num_demo_clips: 1000
+
+###########
+# Rating
+###########
+
+rate_ui:
+    videos_dir: ./output/MineRLBasaltBuildVillageHouse-v0/videos
+    video_fps: 20
+
+###########
+# Reward
+###########
+
+reward:
+    save_dir: ./output/MineRLBasaltBuildVillageHouse-v0/reward_models
+    best_model_path: ./output/MineRLBasaltBuildVillageHouse-v0/reward_models/best.pt
+    # Training params
+    rand_seed: 1
+    max_num_pairs: 25000
+    val_split: 0.05
+    val_every_n_batch: 100
+    save_every_n_batch: 500
+    num_epochs: 1
+    gaussian_prior_weight: 0.1
+    # The model is trained on batches of 16 segment pairs (see below), 
+    # optimized with Adam (Kingma and Ba, 2014) 
+    # with learning rate 0.0003, β1 = 0.9, β2 = 0.999, and eps = 10^−8 .
+    batch_size: 64
+    adam_lr: 0.0003
+    adam_betas: [0.9, 0.999]
+    adam_eps: 0.00000001 # 1e-8

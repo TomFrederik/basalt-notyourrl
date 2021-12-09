@@ -2,7 +2,7 @@ import datetime
 import minerl
 import namesgenerator
 from sacred import Experiment
-import basalt_utils.wrappers as wrapper_utils
+import basalt_utils.src.wrappers as wrapper_utils
 from minerl.herobraine.wrappers.video_recording_wrapper import VideoRecordingWrapper
 from basalt_utils.sb3_compat.policies import SpaceFlatteningActorCriticPolicy
 from basalt_utils.sb3_compat.cnns import MAGICALCNN
